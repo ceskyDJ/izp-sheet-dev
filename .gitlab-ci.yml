@@ -1,0 +1,33 @@
+image: gcc
+
+variables:
+  DEBIAN_FRONTEND: "noninteractive"
+
+build:
+  stage: build
+  script:
+    - gcc -std=c99 -Wall -Wextra -Werror sheet.c -o sheet
+  artifacts:
+    paths:
+      - sheet
+
+unit:
+  stage: test
+  image:
+    name: php:7.4
+  script:
+    - apt-get update < /dev/null > /dev/null
+    - apt-get install -qq -y git < /dev/null > /dev/null
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/ceskyDJ/izp-sheet.git tests
+    - cp sheet tests/tmp/sheet
+    - cd tests
+    - php -v
+    - php test.php
+
+cppcheck:
+  stage: test
+  image:
+    name: alpine
+  script:
+    - apk add cppcheck -q
+    - cppcheck --error-exitcode=1 --enable=all --language=c --suppress=missingIncludeSystem --verbose sheet.c
