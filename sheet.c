@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define MAX_ROW_SIZE 10 * 1024
 
-void someWorkWithRow(char row[], int rowSize);
+void processRow(char *row, int rowSize, const char *delimiters);
+bool isDelimiter(char c, const char *delimiters);
 
 int main(int argc, char **argv) {
     /* ARGUMENTS PARSING */
@@ -11,7 +13,7 @@ int main(int argc, char **argv) {
     int argPos = 1;
 
     // Delimiters
-    char const *DEFAULT_DELIMITER = " ";
+    const char *DEFAULT_DELIMITER = " ";
     char **delimiters = (char **) &DEFAULT_DELIMITER;
 
     // For ex.: sheet.c -d :
@@ -21,25 +23,6 @@ int main(int argc, char **argv) {
             argPos += 2;
         }
     }
-
-    // TODO: Remove! This is just for testing
-    printf("Delimiters: ");
-    char delimiter;
-    int i = 0;
-    while ((delimiter = (*delimiters)[i]) != '\0') {
-        char *format;
-
-        if (i != 0) {
-            format = ", '%c'";
-        } else {
-            format = "'%c'";
-        }
-
-        printf(format, delimiter);
-
-        i++;
-    }
-    printf("\n");
 
     /* ROW PARSING */
     char actualRow[MAX_ROW_SIZE];
@@ -52,8 +35,7 @@ int main(int argc, char **argv) {
 
             j++;
         } else {
-            // TODO: Process the row...
-            someWorkWithRow(actualRow, j);
+            processRow(actualRow, j, *delimiters);
 
             printf("\n");
 
@@ -65,8 +47,27 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-void someWorkWithRow(char row[], int rowSize) {
+void processRow(char *row, int rowSize, const char *delimiters) {
     for (int i = 0; i < rowSize; i++) {
+        // Replace all delimiters with the default one
+        if (isDelimiter(row[i], delimiters) && row[i] != delimiters[0]) {
+            row[i] = delimiters[0];
+        }
+
         printf("%c", row[i]);
     }
+}
+
+bool isDelimiter(char c, const char *delimiters) {
+    char delimiter;
+    int i = 0;
+    while ((delimiter = (delimiters)[i]) != '\0') {
+        if (c == delimiter) {
+            return true;
+        }
+
+        i++;
+    }
+
+    return false;
 }
