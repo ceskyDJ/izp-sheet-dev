@@ -29,20 +29,26 @@ int main(int argc, char **argv) {
     int j = 0;
     int c;
 
-    while ((c = getchar()) != EOF) {
-        if (c != '\n') {
+    // Do-while for cases \n is missing at the end of file (for ex. TXT files created in Jetbrains' IDEs)
+    // The last char hasn't be \n
+    do {
+        c = getchar();
+
+        if (c != '\n' && c != EOF) {
             actualRow[j] = (unsigned char) c;
 
             j++;
         } else {
             processRow(actualRow, j, *delimiters);
 
-            printf("\n");
+            if (c != EOF) {
+                printf("\n");
 
-            // Start at the beginning of the array, old values will be replaced
-            j = 0;
+                // Start at the beginning of the array, old values will be replaced
+                j = 0;
+            }
         }
-    }
+    } while (c != EOF);
 
     return 0;
 }
