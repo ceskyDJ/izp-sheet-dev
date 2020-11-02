@@ -3,3 +3,7 @@
 
 # Compiled and debug files
 cmake-build-debug/
+
+# Test input and output files
+input.txt
+output.txt
