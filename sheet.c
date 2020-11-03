@@ -13,7 +13,16 @@
 
 #define MAX_ROW_SIZE 10 * 1024
 
-void processRow(char *row, int rowSize, const char *delimiters);
+/**
+ * @typedef Individual row for processing
+ */
+typedef struct row {
+    char data[MAX_ROW_SIZE];
+    int size;
+} Row;
+
+void writeProcessedRow(Row row);
+void processRow(Row *row, const char *delimiters);
 bool isDelimiter(char c, const char *delimiters);
 
 int main(int argc, char **argv) {
@@ -34,7 +43,7 @@ int main(int argc, char **argv) {
     }
 
     /* ROW PARSING */
-    char actualRow[MAX_ROW_SIZE];
+    Row row;
     int j = 0;
     int c;
 
@@ -44,11 +53,14 @@ int main(int argc, char **argv) {
         c = getchar();
 
         if (c != '\n' && c != EOF) {
-            actualRow[j] = (unsigned char) c;
+            row.data[j] = (unsigned char) c;
 
             j++;
         } else {
-            processRow(actualRow, j, *delimiters);
+            row.size = j;
+            processRow(&row, *delimiters);
+
+            writeProcessedRow(row);
 
             if (c != EOF) {
                 printf("\n");
@@ -62,14 +74,18 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-void processRow(char *row, int rowSize, const char *delimiters) {
-    for (int i = 0; i < rowSize; i++) {
-        // Replace all delimiters with the default one
-        if (isDelimiter(row[i], delimiters) && row[i] != delimiters[0]) {
-            row[i] = delimiters[0];
-        }
+void writeProcessedRow(Row row) {
+    for (int i = 0; i < row.size; i++) {
+        printf("%c", row.data[i]);
+    }
+}
 
-        printf("%c", row[i]);
+void processRow(Row *row, const char *delimiters) {
+    for (int i = 0; i < row->size; i++) {
+        // Replace all delimiters with the default one
+        if (isDelimiter(row->data[i], delimiters) && row->data[i] != delimiters[0]) {
+            row->data[i] = delimiters[0];
+        }
     }
 }
 
