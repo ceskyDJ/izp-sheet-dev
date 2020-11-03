@@ -31,8 +31,8 @@ typedef struct errorInfo {
 } ErrorInfo;
 
 void writeProcessedRow(Row row);
-ErrorInfo processRow(Row *row, const char *delimiters);
-bool isDelimiter(char c, const char *delimiters);
+ErrorInfo processRow(Row *row, char **delimiters);
+bool isDelimiter(char c, char **delimiters);
 
 int main(int argc, char **argv) {
     /* ARGUMENTS PARSING */
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
             j++;
         } else {
             row.size = j;
-            processRow(&row, *delimiters);
+            processRow(&row, delimiters);
 
             writeProcessedRow(row);
 
@@ -89,23 +89,23 @@ void writeProcessedRow(Row row) {
     }
 }
 
-ErrorInfo processRow(Row *row, const char *delimiters) {
+ErrorInfo processRow(Row *row, char **delimiters) {
     ErrorInfo errorInfo = {false};
 
     for (int i = 0; i < row->size; i++) {
         // Replace all delimiters with the default one
-        if (isDelimiter(row->data[i], delimiters) && row->data[i] != delimiters[0]) {
-            row->data[i] = delimiters[0];
+        if (isDelimiter(row->data[i], delimiters) && row->data[i] != (*delimiters)[0]) {
+            row->data[i] = (*delimiters)[0];
         }
     }
 
     return errorInfo;
 }
 
-bool isDelimiter(char c, const char *delimiters) {
+bool isDelimiter(char c, char **delimiters) {
     char delimiter;
     int i = 0;
-    while ((delimiter = (delimiters)[i]) != '\0') {
+    while ((delimiter = (*delimiters)[i]) != '\0') {
         if (c == delimiter) {
             return true;
         }
