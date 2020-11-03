@@ -20,9 +20,18 @@ typedef struct row {
     char data[MAX_ROW_SIZE];
     int size;
 } Row;
+/**
+ * @typedef Error information tells how some action ended
+ * @error: Did it end with error? (=> if true, something bad happened; otherwise the operation was successful)
+ * @message: Description message in case of error = true
+ */
+typedef struct errorInfo {
+    bool error;
+    char *message;
+} ErrorInfo;
 
 void writeProcessedRow(Row row);
-void processRow(Row *row, const char *delimiters);
+ErrorInfo processRow(Row *row, const char *delimiters);
 bool isDelimiter(char c, const char *delimiters);
 
 int main(int argc, char **argv) {
@@ -80,13 +89,17 @@ void writeProcessedRow(Row row) {
     }
 }
 
-void processRow(Row *row, const char *delimiters) {
+ErrorInfo processRow(Row *row, const char *delimiters) {
+    ErrorInfo errorInfo = {false};
+
     for (int i = 0; i < row->size; i++) {
         // Replace all delimiters with the default one
         if (isDelimiter(row->data[i], delimiters) && row->data[i] != delimiters[0]) {
             row->data[i] = delimiters[0];
         }
     }
+
+    return errorInfo;
 }
 
 bool isDelimiter(char c, const char *delimiters) {
