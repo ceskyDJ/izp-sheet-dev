@@ -67,43 +67,24 @@ int main(int argc, char **argv) {
     /* ROW PARSING */
     Row row;
     int lastNumberOfColumns = -1;
-    int j = 0;
-    int c;
 
-    // Do-while for cases \n is missing at the end of file (for ex. TXT files created in Jetbrains' IDEs)
-    // The last char hasn't be \n
-    do {
-        c = getchar();
+    while (fgets(row.data, MAX_ROW_SIZE, stdin) != NULL) {
+        row.size = strlen(row.data);
 
-        if (c != '\n' && c != EOF) {
-            row.data[j] = (unsigned char) c;
+        int numberOfColumns;
+        processRow(&row, delimiters, &numberOfColumns);
 
-            j++;
-        } else {
-            int numberOfColumns;
-
-            row.size = j;
-            processRow(&row, delimiters, &numberOfColumns);
-
-            if (lastNumberOfColumns == -1) {
-                lastNumberOfColumns = numberOfColumns;
-            }
-
-            if (numberOfColumns != lastNumberOfColumns) {
-                writeErrorMessage("Tabulka nema stejny pocet sloupcu ve vsech radcich.");
-                return 1;
-            }
-
-            writeProcessedRow(&row);
-
-            if (c != EOF) {
-                printf("\n");
-
-                // Start at the beginning of the array, old values will be replaced
-                j = 0;
-            }
+        if (lastNumberOfColumns == -1) {
+            lastNumberOfColumns = numberOfColumns;
         }
-    } while (c != EOF);
+
+        if (numberOfColumns != lastNumberOfColumns) {
+            writeErrorMessage("Tabulka nema stejny pocet sloupcu ve vsech radcich.");
+            return 1;
+        }
+
+        writeProcessedRow(&row);
+    }
 
     return 0;
 }
