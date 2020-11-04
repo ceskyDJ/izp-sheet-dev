@@ -36,7 +36,7 @@ typedef struct errorInfo {
 
 void writeProcessedRow(Row *row);
 ErrorInfo processRow(Row *row, char **delimiters);
-void unifyDelimiters(Row *row, char **delimiters);
+char unifyDelimiters(Row *row, char **delimiters);
 bool isDelimiter(char c, char **delimiters);
 
 /**
@@ -114,7 +114,7 @@ ErrorInfo processRow(Row *row, char **delimiters) {
     ErrorInfo errorInfo = {false};
 
     // Delimiters processing
-    unifyDelimiters(row, delimiters);
+    char delimiter = unifyDelimiters(row, delimiters);
 
     return errorInfo;
 }
@@ -123,13 +123,18 @@ ErrorInfo processRow(Row *row, char **delimiters) {
  * Unifies delimiters in provided row - all will be replaced with the first one
  * @param row Edited row
  * @param delimiters Used delimiters
+ * @return Result delimiter
  */
-void unifyDelimiters(Row *row, char **delimiters) {
+char unifyDelimiters(Row *row, char **delimiters) {
+    char mainDelimiter = (*delimiters)[0];
+
     for (int i = 0; i < row->size; i++) {
-        if (isDelimiter(row->data[i], delimiters) && row->data[i] != (*delimiters)[0]) {
-            row->data[i] = (*delimiters)[0];
+        if (isDelimiter(row->data[i], delimiters) && row->data[i] != mainDelimiter) {
+            row->data[i] = mainDelimiter;
         }
     }
+
+    return mainDelimiter;
 }
 
 /**
