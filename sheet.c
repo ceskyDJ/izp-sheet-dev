@@ -35,6 +35,7 @@ typedef struct errorInfo {
 } ErrorInfo;
 
 void writeProcessedRow(Row *row);
+void writeErrorMessage(char *message);
 ErrorInfo processRow(Row *row, char **delimiters, int *numberOfColumns);
 char unifyDelimiters(Row *row, char **delimiters);
 bool isDelimiter(char c, char **delimiters);
@@ -89,6 +90,7 @@ int main(int argc, char **argv) {
             }
 
             if (numberOfColumns != lastNumberOfColumns) {
+                writeErrorMessage("Tabulka nema stejny pocet sloupcu ve vsech radcich.");
                 return 1;
             }
 
@@ -114,6 +116,14 @@ void writeProcessedRow(Row *row) {
     for (int i = 0; i < row->size; i++) {
         printf("%c", row->data[i]);
     }
+}
+
+/**
+ * Writes error message to standard error output
+ * @param message Error message
+ */
+void writeErrorMessage(char *message) {
+    fprintf(stderr, "sheet: %s", message);
 }
 
 /**
