@@ -7,10 +7,14 @@
  * @date October-November 2020
  * @version 1.0
  */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
 
+/**
+ * Maximum size of one row (in bytes)
+ */
 #define MAX_ROW_SIZE 10 * 1024
 
 /**
@@ -35,6 +39,12 @@ ErrorInfo processRow(Row *row, char **delimiters);
 void unifyDelimiters(Row *row, char **delimiters);
 bool isDelimiter(char c, char **delimiters);
 
+/**
+ * Main function
+ * @param argc Number of input arguments
+ * @param argv Input arguments
+ * @return Error code (0 => OK, 1 => error)
+ */
 int main(int argc, char **argv) {
     /* ARGUMENTS PARSING */
     // Actual position in input arguments array - from 1 (program path is skipped)
@@ -84,12 +94,22 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+/**
+ * Writes already processed row to standard output
+ * @param row Processed row
+ */
 void writeProcessedRow(Row row) {
     for (int i = 0; i < row.size; i++) {
         printf("%c", row.data[i]);
     }
 }
 
+/**
+ * Processes provided row by other parameters
+ * @param row Input (raw) row
+ * @param delimiters Used delimiters
+ * @return Error information
+ */
 ErrorInfo processRow(Row *row, char **delimiters) {
     ErrorInfo errorInfo = {false};
 
@@ -112,6 +132,12 @@ void unifyDelimiters(Row *row, char **delimiters) {
     }
 }
 
+/**
+ * Checks if the provided char is a delimiter
+ * @param c Char for checking
+ * @param delimiters Used delimiters
+ * @return Is the char a delimiter?
+ */
 bool isDelimiter(char c, char **delimiters) {
     char delimiter;
     int i = 0;
