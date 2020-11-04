@@ -34,7 +34,7 @@ typedef struct errorInfo {
     char *message;
 } ErrorInfo;
 
-void writeProcessedRow(Row row);
+void writeProcessedRow(Row *row);
 ErrorInfo processRow(Row *row, char **delimiters);
 void unifyDelimiters(Row *row, char **delimiters);
 bool isDelimiter(char c, char **delimiters);
@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
             row.size = j;
             processRow(&row, delimiters);
 
-            writeProcessedRow(row);
+            writeProcessedRow(&row);
 
             if (c != EOF) {
                 printf("\n");
@@ -98,9 +98,9 @@ int main(int argc, char **argv) {
  * Writes already processed row to standard output
  * @param row Processed row
  */
-void writeProcessedRow(Row row) {
-    for (int i = 0; i < row.size; i++) {
-        printf("%c", row.data[i]);
+void writeProcessedRow(Row *row) {
+    for (int i = 0; i < row->size; i++) {
+        printf("%c", row->data[i]);
     }
 }
 
