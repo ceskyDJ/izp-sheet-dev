@@ -35,9 +35,10 @@ typedef struct errorInfo {
 } ErrorInfo;
 
 void writeProcessedRow(Row *row);
-ErrorInfo processRow(Row *row, char **delimiters);
+ErrorInfo processRow(Row *row, char **delimiters, int *numberOfColumns);
 char unifyDelimiters(Row *row, char **delimiters);
 bool isDelimiter(char c, char **delimiters);
+int countColumns(Row *row, char delimiter);
 
 /**
  * Main function
@@ -64,6 +65,7 @@ int main(int argc, char **argv) {
 
     /* ROW PARSING */
     Row row;
+    int lastNumberOfColumns = -1;
     int j = 0;
     int c;
 
@@ -77,8 +79,18 @@ int main(int argc, char **argv) {
 
             j++;
         } else {
+            int numberOfColumns;
+
             row.size = j;
-            processRow(&row, delimiters);
+            processRow(&row, delimiters, &numberOfColumns);
+
+            if (lastNumberOfColumns == -1) {
+                lastNumberOfColumns = numberOfColumns;
+            }
+
+            if (numberOfColumns != lastNumberOfColumns) {
+                return 1;
+            }
 
             writeProcessedRow(&row);
 
@@ -110,11 +122,12 @@ void writeProcessedRow(Row *row) {
  * @param delimiters Used delimiters
  * @return Error information
  */
-ErrorInfo processRow(Row *row, char **delimiters) {
+ErrorInfo processRow(Row *row, char **delimiters, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
 
     // Delimiters processing
     char delimiter = unifyDelimiters(row, delimiters);
+    *numberOfColumns = countColumns(row, delimiter);
 
     return errorInfo;
 }
@@ -155,4 +168,29 @@ bool isDelimiter(char c, char **delimiters) {
     }
 
     return false;
+}
+
+/**
+ * Counts number of columns in provided row
+ * @param row Row
+ * @param delimiter Column delimiter
+ * @return Number of columns in the row
+ */
+int countColumns(Row *row, char delimiter) {
+    // Empty row has always 0 columns
+    if (row->size == 0) {
+        return 0;
+    }
+
+    // Non-empty row has 1 column minimally
+    int counter = 1;
+
+    // Every next delimiter =>  next column
+    for (int i = 0; i < row->size; i++) {
+        if (row->data[i] == delimiter) {
+            counter++;
+        }
+    }
+
+    return counter;
 }
