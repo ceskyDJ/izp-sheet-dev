@@ -87,12 +87,15 @@ int main(int argc, char **argv) {
     InputArguments args = {argv, argc, 1};
 
     // Delimiters
-    char **delimiters = (char **) &(DEFAULT_DELIMITER);
+    char **delimiters;
     if (argc >= 3) {
         if (strcmp(args.data[args.skipped], "-d") == 0) {
             delimiters = &args.data[args.skipped + 1];
             args.skipped += 2;
         }
+    } else {
+        const char *DELIMITER = DEFAULT_DELIMITER;
+        delimiters = (char **) &DELIMITER;
     }
 
     /* ROW PARSING */
