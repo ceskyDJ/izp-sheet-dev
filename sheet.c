@@ -13,16 +13,18 @@
 #include <stdbool.h>
 
 /**
- * Maximum size of one row (in bytes)
+ * @def MAX_ROW_SIZE Maximum size of one row (in bytes)
  */
 #define MAX_ROW_SIZE 10 * 1024
 /**
- * Default delimiter for case user didn't set different
+ * @def DEFAULT_DELIMITER Default delimiter for case user didn't set different
  */
 #define DEFAULT_DELIMITER ""
 
 /**
- * @typedef Individual row for processing
+ * @typedef Row Individual row for processing
+ * @field data Row content
+ * @field size Row size (number of contained chars)
  */
 typedef struct row {
     char data[MAX_ROW_SIZE];
@@ -30,8 +32,8 @@ typedef struct row {
 } Row;
 /**
  * @typedef Error information tells how some action ended
- * @error: Did it end with error? (=> if true, something bad happened; otherwise the operation was successful)
- * @message: Description message in case of error = true
+ * @field error Did it end with error? (=> if true, something bad happened; otherwise the operation was successful)
+ * @field message Description message in case of error = true
  */
 typedef struct errorInfo {
     bool error;
@@ -39,9 +41,9 @@ typedef struct errorInfo {
 } ErrorInfo;
 /**
  * @typedef Input program arguments from argv
- * @args: Array of arguments
- * @size: Size of the arguments array
- * @skipped: Number of skipped arguments (already used)
+ * @field args Array of arguments
+ * @field size Size of the arguments array
+ * @field skipped Number of skipped arguments (already used)
  */
 typedef struct inputArguments {
     char **args;
