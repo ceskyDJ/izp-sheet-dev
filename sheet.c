@@ -45,12 +45,12 @@ typedef struct {
     int skipped;
 } InputArguments;
 
-void writeProcessedRow(Row *row);
-void writeErrorMessage(char *message);
-ErrorInfo processRow(Row *row, char **delimiters, int *numberOfColumns);
-char unifyDelimiters(Row *row, char **delimiters);
-bool isDelimiter(char c, char **delimiters);
-int countColumns(Row *row, char delimiter);
+void writeProcessedRow(const Row *row);
+void writeErrorMessage(const char *message);
+ErrorInfo processRow(Row *row, const char **delimiters, int *numberOfColumns);
+char unifyDelimiters(Row *row, const char **delimiters);
+bool isDelimiter(char c, const char **delimiters);
+int countColumns(const Row *row, char delimiter);
 
 /**
  * Main function
@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
         row.size = strlen(row.data);
 
         int numberOfColumns;
-        processRow(&row, delimiters, &numberOfColumns);
+        processRow(&row, (const char **) delimiters, &numberOfColumns);
 
         if (lastNumberOfColumns == -1) {
             lastNumberOfColumns = numberOfColumns;
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
  * Writes already processed row to standard output
  * @param row Processed row
  */
-void writeProcessedRow(Row *row) {
+void writeProcessedRow(const Row *row) {
     for (int i = 0; i < row->size; i++) {
         printf("%c", row->data[i]);
     }
@@ -114,7 +114,7 @@ void writeProcessedRow(Row *row) {
  * Writes error message to standard error output
  * @param message Error message
  */
-void writeErrorMessage(char *message) {
+void writeErrorMessage(const char *message) {
     fprintf(stderr, "sheet: %s", message);
 }
 
@@ -124,7 +124,7 @@ void writeErrorMessage(char *message) {
  * @param delimiters Used delimiters
  * @return Error information
  */
-ErrorInfo processRow(Row *row, char **delimiters, int *numberOfColumns) {
+ErrorInfo processRow(Row *row, const char **delimiters, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
 
     // Delimiters processing
@@ -140,7 +140,7 @@ ErrorInfo processRow(Row *row, char **delimiters, int *numberOfColumns) {
  * @param delimiters Used delimiters
  * @return Result delimiter
  */
-char unifyDelimiters(Row *row, char **delimiters) {
+char unifyDelimiters(Row *row, const char **delimiters) {
     char mainDelimiter = (*delimiters)[0];
 
     for (int i = 0; i < row->size; i++) {
@@ -158,7 +158,7 @@ char unifyDelimiters(Row *row, char **delimiters) {
  * @param delimiters Used delimiters
  * @return Is the char a delimiter?
  */
-bool isDelimiter(char c, char **delimiters) {
+bool isDelimiter(char c, const char **delimiters) {
     char delimiter;
     int i = 0;
     while ((delimiter = (*delimiters)[i]) != '\0') {
@@ -178,7 +178,7 @@ bool isDelimiter(char c, char **delimiters) {
  * @param delimiter Column delimiter
  * @return Number of columns in the row
  */
-int countColumns(Row *row, char delimiter) {
+int countColumns(const Row *row, char delimiter) {
     // Empty row has always 0 columns
     if (row->size == 0) {
         return 0;
