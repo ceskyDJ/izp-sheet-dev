@@ -24,7 +24,7 @@
 /**
  * @typedef Individual row for processing
  */
-typedef struct {
+typedef struct row {
     char data[MAX_ROW_SIZE];
     int size;
 } Row;
@@ -33,7 +33,7 @@ typedef struct {
  * @error: Did it end with error? (=> if true, something bad happened; otherwise the operation was successful)
  * @message: Description message in case of error = true
  */
-typedef struct {
+typedef struct errorInfo {
     bool error;
     char *message;
 } ErrorInfo;
@@ -43,7 +43,7 @@ typedef struct {
  * @size: Size of the arguments array
  * @skipped: Number of skipped arguments (already used)
  */
-typedef struct {
+typedef struct inputArguments {
     char **args;
     int size;
     int skipped;
