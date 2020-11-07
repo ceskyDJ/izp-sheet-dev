@@ -85,7 +85,12 @@ int main(int argc, char **argv) {
         row.size = strlen(row.data);
         row.number++;
 
-        processRow(&row, (const char **) delimiters);
+        ErrorInfo err;
+        if ((err = processRow(&row, (const char **) delimiters)).error) {
+            writeErrorMessage(err.message);
+
+            return 1;
+        }
 
         writeProcessedRow(&row);
     }
@@ -119,6 +124,14 @@ void writeErrorMessage(const char *message) {
  */
 ErrorInfo processRow(Row *row, const char **delimiters) {
     ErrorInfo errorInfo = {false};
+
+    // Check max row size
+    if (row->data[MAX_ROW_SIZE - 1] != '\0' && row->data[MAX_ROW_SIZE - 1] != '\n') {
+        errorInfo.error = true;
+        errorInfo.message = "Byla prekrocena maximalni velikost radku.";
+
+        return errorInfo;
+    }
 
     // Delimiters processing
     /*char delimiter =*/ unifyDelimiters(row, delimiters);
