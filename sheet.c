@@ -16,6 +16,10 @@
  * Maximum size of one row (in bytes)
  */
 #define MAX_ROW_SIZE 10 * 1024
+/**
+ * Default delimiter for case user didn't set different
+ */
+#define DEFAULT_DELIMITER ""
 
 /**
  * @typedef Individual row for processing
@@ -64,10 +68,7 @@ int main(int argc, char **argv) {
     InputArguments args = {argv, argc, 1};
 
     // Delimiters
-    const char *DEFAULT_DELIMITER = " ";
-    char **delimiters = (char **) &DEFAULT_DELIMITER;
-
-    // For ex.: sheet.c -d :-+
+    char **delimiters = (char **) &(DEFAULT_DELIMITER);
     if (argc >= 3) {
         if (strcmp(args.args[args.skipped], "-d") == 0) {
             delimiters = &args.args[args.skipped + 1];
