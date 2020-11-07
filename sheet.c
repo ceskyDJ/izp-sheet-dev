@@ -25,10 +25,12 @@
  * @typedef Row Individual row for processing
  * @field data Row content
  * @field size Row size (number of contained chars)
+ * @field number Row number (from 1)
  */
 typedef struct row {
     char data[MAX_ROW_SIZE];
     int size;
+    int number;
 } Row;
 /**
  * @typedef Error information tells how some action ended
@@ -79,11 +81,11 @@ int main(int argc, char **argv) {
     }
 
     /* ROW PARSING */
-    Row row;
+    Row row = {.number = 0};
     int lastNumberOfColumns = -1;
-
     while (fgets(row.data, MAX_ROW_SIZE, stdin) != NULL) {
         row.size = strlen(row.data);
+        row.number++;
 
         int numberOfColumns;
         processRow(&row, (const char **) delimiters, &numberOfColumns);
