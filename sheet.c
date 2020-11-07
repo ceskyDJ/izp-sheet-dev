@@ -55,10 +55,9 @@ typedef struct inputArguments {
 
 void writeProcessedRow(const Row *row);
 void writeErrorMessage(const char *message);
-ErrorInfo processRow(Row *row, const char **delimiters, int *numberOfColumns);
+ErrorInfo processRow(Row *row, const char **delimiters);
 char unifyDelimiters(Row *row, const char **delimiters);
 bool isDelimiter(char c, const char **delimiters);
-int countColumns(const Row *row, char delimiter);
 
 /**
  * Main function
@@ -82,22 +81,11 @@ int main(int argc, char **argv) {
 
     /* ROW PARSING */
     Row row = {.number = 0};
-    int lastNumberOfColumns = -1;
     while (fgets(row.data, MAX_ROW_SIZE, stdin) != NULL) {
         row.size = strlen(row.data);
         row.number++;
 
-        int numberOfColumns;
-        processRow(&row, (const char **) delimiters, &numberOfColumns);
-
-        if (lastNumberOfColumns == -1) {
-            lastNumberOfColumns = numberOfColumns;
-        }
-
-        if (numberOfColumns != lastNumberOfColumns) {
-            writeErrorMessage("Tabulka nema stejny pocet sloupcu ve vsech radcich.");
-            return 1;
-        }
+        processRow(&row, (const char **) delimiters);
 
         writeProcessedRow(&row);
     }
@@ -129,12 +117,11 @@ void writeErrorMessage(const char *message) {
  * @param delimiters Used delimiters
  * @return Error information
  */
-ErrorInfo processRow(Row *row, const char **delimiters, int *numberOfColumns) {
+ErrorInfo processRow(Row *row, const char **delimiters) {
     ErrorInfo errorInfo = {false};
 
     // Delimiters processing
-    char delimiter = unifyDelimiters(row, delimiters);
-    *numberOfColumns = countColumns(row, delimiter);
+    /*char delimiter =*/ unifyDelimiters(row, delimiters);
 
     return errorInfo;
 }
@@ -175,29 +162,4 @@ bool isDelimiter(char c, const char **delimiters) {
     }
 
     return false;
-}
-
-/**
- * Counts number of columns in provided row
- * @param row Row
- * @param delimiter Column delimiter
- * @return Number of columns in the row
- */
-int countColumns(const Row *row, char delimiter) {
-    // Empty row has always 0 columns
-    if (row->size == 0) {
-        return 0;
-    }
-
-    // Non-empty row has 1 column minimally
-    int counter = 1;
-
-    // Every next delimiter =>  next column
-    for (int i = 0; i < row->size; i++) {
-        if (row->data[i] == delimiter) {
-            counter++;
-        }
-    }
-
-    return counter;
 }
