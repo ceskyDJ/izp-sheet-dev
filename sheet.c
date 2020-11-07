@@ -47,12 +47,12 @@ typedef struct errorInfo {
 } ErrorInfo;
 /**
  * @typedef Input program arguments from argv
- * @field args Array of arguments
+ * @field data Array of arguments
  * @field size Size of the arguments array
  * @field skipped Number of skipped arguments (already used)
  */
 typedef struct inputArguments {
-    char **args;
+    char **data;
     int size;
     int skipped;
 } InputArguments;
@@ -78,8 +78,8 @@ int main(int argc, char **argv) {
     // Delimiters
     char **delimiters = (char **) &(DEFAULT_DELIMITER);
     if (argc >= 3) {
-        if (strcmp(args.args[args.skipped], "-d") == 0) {
-            delimiters = &args.args[args.skipped + 1];
+        if (strcmp(args.data[args.skipped], "-d") == 0) {
+            delimiters = &args.data[args.skipped + 1];
             args.skipped += 2;
         }
     }
