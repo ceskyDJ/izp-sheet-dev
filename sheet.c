@@ -25,6 +25,14 @@
  * @def DEFAULT_DELIMITER Default delimiter for case user didn't set different
  */
 #define DEFAULT_DELIMITER ""
+/**
+ * @def ANY_NUMBER Numeric representation of '-' state (any row/column number)
+ */
+#define ANY_NUMBER 0
+/**
+ * @def INVALID_NUMBER Invalid number of row/column provided in input arguments
+ */
+#define INVALID_NUMBER -1
 
 /**
  * @typedef Row Individual row for processing
@@ -60,11 +68,12 @@ typedef struct inputArguments {
 
 void writeProcessedRow(const Row *row);
 void writeErrorMessage(const char *message);
-ErrorInfo processRow(Row *row, const char **delimiters);
+ErrorInfo processRow(Row *row, const char **delimiters, const InputArguments *args);
 char unifyDelimiters(Row *row, const char **delimiters);
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSizes(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
+int convertToRowColumnNumber(char *value);
 
 /**
  * Main function
@@ -93,7 +102,7 @@ int main(int argc, char **argv) {
         row.number++;
 
         ErrorInfo err;
-        if ((err = processRow(&row, (const char **) delimiters)).error) {
+        if ((err = processRow(&row, (const char **) delimiters, &args)).error) {
             writeErrorMessage(err.message);
 
             return EXIT_FAILURE;
@@ -129,7 +138,7 @@ void writeErrorMessage(const char *message) {
  * @param delimiters Used delimiters
  * @return Error information
  */
-ErrorInfo processRow(Row *row, const char **delimiters) {
+ErrorInfo processRow(Row *row, const char **delimiters, const InputArguments *args) {
     ErrorInfo errorInfo = {false};
 
     // Check max row size
@@ -150,6 +159,12 @@ ErrorInfo processRow(Row *row, const char **delimiters) {
         errorInfo.message = "Byla prekrocena maximalni velikost bunky.";
 
         return errorInfo;
+    }
+
+    // Apply table editing functions
+    int newArgsSize = args->size - args->skipped;
+    for (int i = args->skipped; i < newArgsSize; i++) {
+        // TODO: apply functions from argument on the row
     }
 
     return errorInfo;
@@ -239,4 +254,23 @@ int countColumns(Row *row, char delimiter) {
     }
 
     return counter;
+}
+
+/**
+ * Converts string to row/column number
+ * @param value String with expected row/column number
+ * @return Row/column number or ANY_NUMBER for '-' or INVALID_NUMBER for invalid value
+ */
+int convertToRowColumnNumber(char *value) {
+    // Special state - can be any row/column number
+    if (strcmp(value, "-") == 0) {
+        return ANY_NUMBER;
+    }
+
+    int result;
+    if ((result = strtol(value, NULL, 10)) != 0) {
+        return result;
+    } else {
+        return INVALID_NUMBER;
+    }
 }
