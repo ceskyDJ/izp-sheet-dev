@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 /**
  * @def MAX_ROW_SIZE Maximum size of one row (in bytes)
@@ -94,13 +95,13 @@ int main(int argc, char **argv) {
         if ((err = processRow(&row, (const char **) delimiters)).error) {
             writeErrorMessage(err.message);
 
-            return 1;
+            return EXIT_FAILURE;
         }
 
         writeProcessedRow(&row);
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 /**
