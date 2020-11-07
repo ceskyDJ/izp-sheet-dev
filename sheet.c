@@ -33,6 +33,17 @@ typedef struct {
     bool error;
     char *message;
 } ErrorInfo;
+/**
+ * @typedef Input program arguments from argv
+ * @args: Array of arguments
+ * @size: Size of the arguments array
+ * @skipped: Number of skipped arguments (already used)
+ */
+typedef struct {
+    char **args;
+    int size;
+    int skipped;
+} InputArguments;
 
 void writeProcessedRow(Row *row);
 void writeErrorMessage(char *message);
@@ -49,18 +60,18 @@ int countColumns(Row *row, char delimiter);
  */
 int main(int argc, char **argv) {
     /* ARGUMENTS PARSING */
-    // Actual position in input arguments array - from 1 (program path is skipped)
-    int argPos = 1;
+    // The first argument is skipped (program path)
+    InputArguments args = {argv, argc, 1};
 
     // Delimiters
     const char *DEFAULT_DELIMITER = " ";
     char **delimiters = (char **) &DEFAULT_DELIMITER;
 
-    // For ex.: sheet.c -d :
+    // For ex.: sheet.c -d :-+
     if (argc >= 3) {
-        if (strcmp(argv[argPos], "-d") == 0) {
-            delimiters = &argv[argPos + 1];
-            argPos += 2;
+        if (strcmp(args.args[args.skipped], "-d") == 0) {
+            delimiters = &args.args[args.skipped + 1];
+            args.skipped += 2;
         }
     }
 
