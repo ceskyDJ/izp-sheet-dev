@@ -20,7 +20,7 @@
 /**
  * @typedef Individual row for processing
  */
-typedef struct row {
+typedef struct {
     char data[MAX_ROW_SIZE];
     int size;
 } Row;
@@ -29,7 +29,7 @@ typedef struct row {
  * @error: Did it end with error? (=> if true, something bad happened; otherwise the operation was successful)
  * @message: Description message in case of error = true
  */
-typedef struct errorInfo {
+typedef struct {
     bool error;
     char *message;
 } ErrorInfo;
