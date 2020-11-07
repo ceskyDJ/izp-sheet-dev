@@ -64,6 +64,7 @@ ErrorInfo processRow(Row *row, const char **delimiters);
 char unifyDelimiters(Row *row, const char **delimiters);
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSizes(const Row *row, char delimiter);
+int countColumns(Row *row, char delimiter);
 
 /**
  * Main function
@@ -141,6 +142,7 @@ ErrorInfo processRow(Row *row, const char **delimiters) {
 
     // Delimiters processing
     char delimiter = unifyDelimiters(row, delimiters);
+    /*int numberOfColumns =*/ countColumns(row, delimiter);
 
     // Check cell size
     if (checkCellsSizes(row, delimiter) == false) {
@@ -212,4 +214,29 @@ bool checkCellsSizes(const Row *row, char delimiter) {
     }
 
     return true;
+}
+
+/**
+ * Counts number of columns in provided row
+ * @param row Row
+ * @param delimiter Column delimiter
+ * @return Number of columns in the row
+ */
+int countColumns(Row *row, char delimiter) {
+    // Empty row has always 0 columns
+    if (row->size == 0) {
+        return 0;
+    }
+
+    // Non-empty row has 1 column minimally
+    int counter = 1;
+
+    // Every next delimiter =>  next column
+    for (int i = 0; i < row->size; i++) {
+        if (row->data[i] == delimiter) {
+            counter++;
+        }
+    }
+
+    return counter;
 }
