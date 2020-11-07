@@ -17,6 +17,10 @@
  */
 #define MAX_ROW_SIZE 10 * 1024
 /**
+ * @def MAX_CELL_SIZE Maximum size of table cell (in bytes)
+ */
+#define MAX_CELL_SIZE 100
+/**
  * @def DEFAULT_DELIMITER Default delimiter for case user didn't set different
  */
 #define DEFAULT_DELIMITER ""
@@ -58,6 +62,7 @@ void writeErrorMessage(const char *message);
 ErrorInfo processRow(Row *row, const char **delimiters);
 char unifyDelimiters(Row *row, const char **delimiters);
 bool isDelimiter(char c, const char **delimiters);
+bool checkCellsSizes(const Row *row, char delimiter);
 
 /**
  * Main function
@@ -134,7 +139,15 @@ ErrorInfo processRow(Row *row, const char **delimiters) {
     }
 
     // Delimiters processing
-    /*char delimiter =*/ unifyDelimiters(row, delimiters);
+    char delimiter = unifyDelimiters(row, delimiters);
+
+    // Check cell size
+    if (checkCellsSizes(row, delimiter) == false) {
+        errorInfo.error = true;
+        errorInfo.message = "Byla prekrocena maximalni velikost bunky.";
+
+        return errorInfo;
+    }
 
     return errorInfo;
 }
@@ -175,4 +188,27 @@ bool isDelimiter(char c, const char **delimiters) {
     }
 
     return false;
+}
+
+/**
+ * Checks cells' sizes
+ * @param row Row to check cells in
+ * @param delimiter Cell delimiter
+ * @return Does the row contain only valid-sized cells?
+ */
+bool checkCellsSizes(const Row *row, char delimiter) {
+    int size = 0;
+    for (int i = 0; i < row->size; i++) {
+        if (row->data[i] != delimiter) {
+            size++;
+        } else {
+            size = 0;
+        }
+
+        if (size > MAX_CELL_SIZE) {
+            return false;
+        }
+    }
+
+    return true;
 }
