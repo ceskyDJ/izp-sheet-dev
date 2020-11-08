@@ -73,7 +73,8 @@ typedef struct inputArguments {
     int skipped;
 } InputArguments;
 
-// Output functions
+// Input/Output functions
+bool loadRow(Row *row);
 void writeProcessedRow(const Row *row);
 void writeNewRow(char delimiter, int numberOfColumns);
 void writeErrorMessage(const char *message);
@@ -113,14 +114,10 @@ int main(int argc, char **argv) {
 
     /* ROW PARSING */
     ErrorInfo err;
-    Row row = {.number = 0};
+    Row row = {.size = 0, .number = 0};
     char delimiter;
     int numberOfColumns;
-    while (fgets(row.data, MAX_ROW_SIZE, stdin) != NULL) {
-        row.size = strlen(row.data);
-        row.number++;
-        row.deleted = false;
-
+    while (loadRow(&row) == true) {
         // Delimiter processing
         delimiter = unifyRowDelimiters(&row, (const char **) delimiters);
 
@@ -151,6 +148,30 @@ int main(int argc, char **argv) {
     applyAppendRowFunctions(&args, delimiter, numberOfColumns);
 
     return EXIT_SUCCESS;
+}
+
+/**
+ * Loads a new row from standard input
+ * @param row Pointer to Row; it's required to set number and size fields
+ * @return Was it successful? If false, no other input is available.
+ */
+bool loadRow(Row *row) {
+    // Delete old data; Size of old row instance is used => first row won't be iterated
+    for (int i = 0; i < row->size; i++) {
+        row->data[i] = '\0';
+    }
+
+    // Try to load new data for the new row; if unsuccessful return false
+    if (fgets(row->data, MAX_ROW_SIZE, stdin) == NULL) {
+        return false;
+    }
+
+    // Update structure with new data
+    row->size = strlen(row->data);
+    row->number++;
+    row->deleted = false;
+
+    return true;
 }
 
 /**
