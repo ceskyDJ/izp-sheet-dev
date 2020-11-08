@@ -221,8 +221,8 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
  */
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, char delimiter, int numberOfColumns*/) {
     ErrorInfo errorInfo = {false};
-    char *functions[1] = {"drow"};
-    int funcArgs[1] = {1};
+    char *functions[2] = {"drow", "drows"};
+    int funcArgs[2] = {1, 2};
 
     // Apply table editing functions
     int numbers[2];
@@ -239,7 +239,13 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, cha
         }
 
         if (streq(args->data[i], "drow")) {
-            if (numbers[0] == row->number) {
+            if (row->number == numbers[0]) {
+                row->deleted = true;
+
+                return errorInfo; // Doesn't make sense to continue, when the row would be deleted
+            }
+        } else if (streq(args->data[i], "drows")) {
+            if (row->number >= numbers[0] && row->number <= numbers[1]) {
                 row->deleted = true;
 
                 return errorInfo; // Doesn't make sense to continue, when the row would be deleted
