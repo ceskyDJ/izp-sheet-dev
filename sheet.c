@@ -80,7 +80,7 @@ void writeErrorMessage(const char *message);
 // Main control and processing
 char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
-ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, char delimiter, int *numberOfColumns*/);
+ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
             numberOfColumns = countColumns(&row, delimiter);
         }
 
-        if ((err = applyTableEditingFunctions(&row, &args/*, delimiter, &numberOfColumns*/)).error == true) {
+        if ((err = applyTableEditingFunctions(&row, &args, delimiter, &numberOfColumns)).error == true) {
             writeErrorMessage(err.message);
 
             return EXIT_FAILURE;
@@ -237,10 +237,10 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
  * @param numberOfColumns Number of column in each row
  * @return Error information
  */
-ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, char delimiter, int *numberOfColumns*/) {
+ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
-    char *functions[2] = {"drow", "drows"};
-    int funcArgs[2] = {1, 2};
+    char *functions[3] = {"irow", "drow", "drows"};
+    int funcArgs[3] = {1, 1, 2};
 
     // Apply table editing functions
     int numbers[2];
@@ -258,17 +258,17 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, cha
             }
         }
 
-        if (streq(args->data[i], "drow")) {
+        if (streq(args->data[i], "irow")) {
+            if (row->number == numbers[0]) {
+                writeNewRow(delimiter, *numberOfColumns);
+            }
+        } else if (streq(args->data[i], "drow")) {
             if (row->number == numbers[0]) {
                 row->deleted = true;
-
-                return errorInfo; // Doesn't make sense to continue, when the row would be deleted
             }
         } else if (streq(args->data[i], "drows")) {
             if (row->number >= numbers[0] && row->number <= numbers[1]) {
                 row->deleted = true;
-
-                return errorInfo; // Doesn't make sense to continue, when the row would be deleted
             }
         }
     }
