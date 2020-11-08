@@ -66,12 +66,16 @@ typedef struct inputArguments {
     int skipped;
 } InputArguments;
 
+// Output functions
 void writeProcessedRow(const Row *row);
 void writeErrorMessage(const char *message);
-ErrorInfo processRow(Row *row, const char **delimiters, const InputArguments *args);
-char unifyDelimiters(Row *row, const char **delimiters);
+// Main control and processing
+char unifyRowDelimiters(Row *row, const char **delimiters);
+ErrorInfo verifyRow(const Row *row, char delimiter);
+/*ErrorInfo processRowData(const InputArguments *args, Row *row, char delimiter, int numberOfColumns);*/
+// Help functions
 bool isDelimiter(char c, const char **delimiters);
-bool checkCellsSizes(const Row *row, char delimiter);
+bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
 int convertToRowColumnNumber(char *value);
 
@@ -99,17 +103,33 @@ int main(int argc, char **argv) {
     }
 
     /* ROW PARSING */
+    ErrorInfo err;
     Row row = {.number = 0};
+    /*int numberOfColumns;*/
     while (fgets(row.data, MAX_ROW_SIZE, stdin) != NULL) {
         row.size = strlen(row.data);
         row.number++;
 
-        ErrorInfo err;
-        if ((err = processRow(&row, (const char **) delimiters, &args)).error) {
+        // Delimiter processing
+        char delimiter = unifyRowDelimiters(&row, (const char **) delimiters);
+
+        // Validation
+        if ((err = verifyRow(&row, delimiter)).error == true) {
             writeErrorMessage(err.message);
 
             return EXIT_FAILURE;
         }
+
+        // Data processing
+        if(row.number == 1) {
+            /*numberOfColumns =*/ countColumns(&row, delimiter);
+        }
+
+        /*if ((err = processRowData(&args, &row, delimiter, numberOfColumns)).error == true) {
+            writeErrorMessage(err.message);
+
+            return EXIT_FAILURE;
+        }*/
 
         writeProcessedRow(&row);
     }
@@ -137,11 +157,49 @@ void writeErrorMessage(const char *message) {
 
 /**
  * Processes provided row by other parameters
+ * @param args Program's input arguments
  * @param row Input (raw) row
- * @param delimiters Used delimiters
+ * @param delimiters Column delimiter
+ * @param numberOfColumns Number of column in each row
  * @return Error information
  */
-ErrorInfo processRow(Row *row, const char **delimiters, const InputArguments *args) {
+/*ErrorInfo processRowData(const InputArguments *args, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    // Apply table editing functions
+    int newArgsSize = args->size - args->skipped;
+    for (int i = args->skipped; i < newArgsSize; i++) {
+        // TODO: apply functions from argument on the row
+    }
+
+    return errorInfo;
+}*/
+
+/**
+ * Unifies delimiters in provided row - all will be replaced with the first one
+ * @param row Edited row
+ * @param delimiters Used delimiters
+ * @return Result delimiter
+ */
+char unifyRowDelimiters(Row *row, const char **delimiters) {
+    char mainDelimiter = (*delimiters)[0];
+
+    for (int i = 0; i < row->size; i++) {
+        if (isDelimiter(row->data[i], delimiters) && row->data[i] != mainDelimiter) {
+            row->data[i] = mainDelimiter;
+        }
+    }
+
+    return mainDelimiter;
+}
+
+/**
+ * Verifies input conditions for row
+ * @param row Row to be checked
+ * @param delimiter Column delimiter
+ * @return Is the row valid?
+ */
+ErrorInfo verifyRow(const Row *row, char delimiter) {
     ErrorInfo errorInfo = {false};
 
     // Check max row size
@@ -152,43 +210,15 @@ ErrorInfo processRow(Row *row, const char **delimiters, const InputArguments *ar
         return errorInfo;
     }
 
-    // Delimiters processing
-    char delimiter = unifyDelimiters(row, delimiters);
-    /*int numberOfColumns =*/ countColumns(row, delimiter);
-
     // Check cell size
-    if (checkCellsSizes(row, delimiter) == false) {
+    if (checkCellsSize(row, delimiter) == false) {
         errorInfo.error = true;
         errorInfo.message = "Byla prekrocena maximalni velikost bunky.";
 
         return errorInfo;
     }
 
-    // Apply table editing functions
-    int newArgsSize = args->size - args->skipped;
-    for (int i = args->skipped; i < newArgsSize; i++) {
-        // TODO: apply functions from argument on the row
-    }
-
     return errorInfo;
-}
-
-/**
- * Unifies delimiters in provided row - all will be replaced with the first one
- * @param row Edited row
- * @param delimiters Used delimiters
- * @return Result delimiter
- */
-char unifyDelimiters(Row *row, const char **delimiters) {
-    char mainDelimiter = (*delimiters)[0];
-
-    for (int i = 0; i < row->size; i++) {
-        if (isDelimiter(row->data[i], delimiters) && row->data[i] != mainDelimiter) {
-            row->data[i] = mainDelimiter;
-        }
-    }
-
-    return mainDelimiter;
 }
 
 /**
@@ -212,12 +242,12 @@ bool isDelimiter(char c, const char **delimiters) {
 }
 
 /**
- * Checks cells' sizes
+ * Checks cells' size
  * @param row Row to check cells in
  * @param delimiter Cell delimiter
  * @return Does the row contain only valid-sized cells?
  */
-bool checkCellsSizes(const Row *row, char delimiter) {
+bool checkCellsSize(const Row *row, char delimiter) {
     int size = 0;
     for (int i = 0; i < row->size; i++) {
         if (row->data[i] != delimiter) {
