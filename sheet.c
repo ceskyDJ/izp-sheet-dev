@@ -35,6 +35,11 @@
 #define INVALID_NUMBER -1
 
 /**
+ * @def streq(first, second) Check if first equals second
+ */
+#define streq(first, second) strcmp(first, second) == 0
+
+/**
  * @typedef Row Individual row for processing
  * @field data Row content
  * @field size Row size (number of contained chars)
@@ -95,7 +100,7 @@ int main(int argc, char **argv) {
     // Delimiters
     char **delimiters;
     if (argc >= 3) {
-        if (strcmp(args.data[args.skipped], "-d") == 0) {
+        if (streq(args.data[args.skipped], "-d")) {
             delimiters = &args.data[args.skipped + 1];
             args.skipped += 2;
         }
@@ -223,7 +228,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, cha
     int numbers[2];
     for (int i = args->skipped; i < (args->size - 1); i++) {
         for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
-            if (strcmp(args->data[i], functions[j]) == 0) {
+            if (streq(args->data[i], functions[j])) {
                 for (int k = 0; k < funcArgs[j]; k++) {
                     if ((numbers[k] = convertToRowColumnNumber(args->data[i + 1])) == INVALID_NUMBER) {
                         errorInfo.error = true;
@@ -233,7 +238,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, cha
             }
         }
 
-        if (strcmp(args->data[i], "drow") == 0) {
+        if (streq(args->data[i], "drow")) {
             if (numbers[0] == row->number) {
                 row->deleted = true;
 
@@ -320,7 +325,7 @@ int countColumns(Row *row, char delimiter) {
  */
 int convertToRowColumnNumber(char *value) {
     // Special state - can be any row/column number
-    if (strcmp(value, "-") == 0) {
+    if (streq(value, "-")) {
         return ANY_NUMBER;
     }
 
