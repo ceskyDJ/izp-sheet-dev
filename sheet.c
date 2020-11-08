@@ -84,7 +84,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, cha
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
-int convertToRowColumnNumber(char *value);
+int toRowColNum(char *value);
 
 /**
  * Main function
@@ -227,10 +227,12 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, cha
     // Apply table editing functions
     int numbers[2];
     for (int i = args->skipped; i < (args->size - 1); i++) {
+        // Prepare arguments for functions
         for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
             if (streq(args->data[i], functions[j])) {
                 for (int k = 0; k < funcArgs[j]; k++) {
-                    if ((numbers[k] = convertToRowColumnNumber(args->data[i + (k + 1)])) == INVALID_NUMBER) {
+                    int index = i + k + 1; // Index of argument in InputArguments
+                    if (index > (args->size - 1) || (numbers[k] = toRowColNum(args->data[index])) == INVALID_NUMBER) {
                         errorInfo.error = true;
                         errorInfo.message = "Chybné číslo řádku/sloupce, povolena jsou celá čísla od 1.";
                     }
@@ -329,7 +331,7 @@ int countColumns(Row *row, char delimiter) {
  * @param value String with expected row/column number
  * @return Row/column number or ANY_NUMBER for '-' or INVALID_NUMBER for invalid value
  */
-int convertToRowColumnNumber(char *value) {
+int toRowColNum(char *value) {
     // Special state - can be any row/column number
     if (streq(value, "-")) {
         return ANY_NUMBER;
