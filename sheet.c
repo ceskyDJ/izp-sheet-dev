@@ -260,8 +260,8 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
  */
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
-    char *functions[3] = {"irow", "drow", "drows"};
-    int funcArgs[3] = {1, 1, 2};
+    char *functions[4] = {"irow", "drow", "drows", "acol"};
+    int funcArgs[4] = {1, 1, 2, 0};
 
     // Apply table editing functions
     int numbers[2];
@@ -279,6 +279,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
             }
         }
 
+        // Column-operated functions are skipped if the row is set as deleted - it doesn't make sense to apply them
         if (streq(args->data[i], "irow")) {
             if (row->number == numbers[0]) {
                 writeNewRow(delimiter, *numberOfColumns);
@@ -290,6 +291,17 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
         } else if (streq(args->data[i], "drows")) {
             if (row->number >= numbers[0] && row->number <= numbers[1]) {
                 row->deleted = true;
+            }
+        } else if (row->deleted == false && streq(args->data[i], "acol")) {
+            if ((row->size + 1) < MAX_ROW_SIZE) {
+                row->data[row->size - 1] = delimiter;
+                row->data[row->size] = '\n';
+                row->size++;
+            } else {
+                errorInfo.error = true;
+                errorInfo.message = "Provedením příkazu acol byla překročena maximální velikost řádku.";
+
+                return errorInfo;
             }
         }
     }
