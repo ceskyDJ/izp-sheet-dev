@@ -26,9 +26,9 @@
  */
 #define DEFAULT_DELIMITER ""
 /**
- * @def ANY_NUMBER Numeric representation of '-' state (any row/column number)
+ * @def LAST_ROW_NUMBER Replacement for last row number
  */
-#define ANY_NUMBER 0
+#define LAST_ROW_NUMBER 0
 /**
  * @def INVALID_NUMBER Invalid number of row/column provided in input arguments
  */
@@ -86,7 +86,7 @@ void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfC
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
-int toRowColNum(char *value);
+int toRowColNum(char *value, bool specialAllowed);
 
 /**
  * Main function
@@ -250,7 +250,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
             if (streq(args->data[i], functions[j])) {
                 for (int k = 0; k < funcArgs[j]; k++) {
                     int index = i + k + 1; // Index of argument in InputArguments
-                    if (index >= args->size || (numbers[k] = toRowColNum(args->data[index])) == INVALID_NUMBER) {
+                    if (index >= args->size || (numbers[k] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
                         errorInfo.error = true;
                         errorInfo.message = "Chybné číslo řádku/sloupce, povolena jsou celá čísla od 1.";
                     }
@@ -361,16 +361,17 @@ int countColumns(Row *row, char delimiter) {
 /**
  * Converts string to row/column number
  * @param value String with expected row/column number
- * @return Row/column number or ANY_NUMBER for '-' or INVALID_NUMBER for invalid value
+ * @param specialAllowed Is special state allowed? ('-' for last row)
+ * @return Row/column number or LAST_ROW_NUMBER for '-' or INVALID_NUMBER for invalid value
  */
-int toRowColNum(char *value) {
-    // Special state - can be any row/column number
-    if (streq(value, "-")) {
-        return ANY_NUMBER;
+int toRowColNum(char *value, bool specialAllowed) {
+    // Special state - the last row number
+    if (streq(value, "-") && specialAllowed == true) {
+        return LAST_ROW_NUMBER;
     }
 
     int result;
-    if ((result = strtol(value, NULL, 10)) != 0) {
+    if ((result = strtol(value, NULL, 10)) >= 1) {
         return result;
     } else {
         return INVALID_NUMBER;
