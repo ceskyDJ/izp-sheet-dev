@@ -75,6 +75,7 @@ typedef struct inputArguments {
 
 // Output functions
 void writeProcessedRow(const Row *row);
+void writeNewRow(int numberOfColumns, char delimiter);
 void writeErrorMessage(const char *message);
 // Main control and processing
 char unifyRowDelimiters(Row *row, const char **delimiters);
@@ -153,8 +154,20 @@ int main(int argc, char **argv) {
  */
 void writeProcessedRow(const Row *row) {
     for (int i = 0; i < row->size; i++) {
-        printf("%c", row->data[i]);
+        putchar(row->data[i]);
     }
+}
+
+/**
+ * Writes new row to standard output
+ * @param numberOfColumns Number of columns of the new row
+ * @param delimiter Column delimiter
+ */
+void writeNewRow(int numberOfColumns, char delimiter) {
+    for (int i = 0; i < numberOfColumns - 1; i++) {
+        putchar(delimiter);
+    }
+    putchar('\n');
 }
 
 /**
