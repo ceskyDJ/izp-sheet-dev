@@ -75,7 +75,7 @@ ErrorInfo verifyRow(const Row *row, char delimiter);
 /*ErrorInfo processRowData(const InputArguments *args, Row *row, char delimiter, int numberOfColumns);*/
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
-bool checkCellsSizes(const Row *row, char delimiter);
+bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
 int convertToRowColumnNumber(char *value);
 
@@ -211,7 +211,7 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
     }
 
     // Check cell size
-    if (checkCellsSizes(row, delimiter) == false) {
+    if (checkCellsSize(row, delimiter) == false) {
         errorInfo.error = true;
         errorInfo.message = "Byla prekrocena maximalni velikost bunky.";
 
@@ -242,12 +242,12 @@ bool isDelimiter(char c, const char **delimiters) {
 }
 
 /**
- * Checks cells' sizes
+ * Checks cells' size
  * @param row Row to check cells in
  * @param delimiter Cell delimiter
  * @return Does the row contain only valid-sized cells?
  */
-bool checkCellsSizes(const Row *row, char delimiter) {
+bool checkCellsSize(const Row *row, char delimiter) {
     int size = 0;
     for (int i = 0; i < row->size; i++) {
         if (row->data[i] != delimiter) {
