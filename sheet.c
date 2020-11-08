@@ -75,12 +75,13 @@ typedef struct inputArguments {
 
 // Output functions
 void writeProcessedRow(const Row *row);
-void writeNewRow(int numberOfColumns, char delimiter);
+void writeNewRow(char delimiter, int numberOfColumns);
 void writeErrorMessage(const char *message);
 // Main control and processing
 char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
-ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, char delimiter, int numberOfColumns*/);
+ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, char delimiter, int *numberOfColumns*/);
+void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
@@ -113,14 +114,15 @@ int main(int argc, char **argv) {
     /* ROW PARSING */
     ErrorInfo err;
     Row row = {.number = 0};
-    /*int numberOfColumns;*/
+    char delimiter;
+    int numberOfColumns;
     while (fgets(row.data, MAX_ROW_SIZE, stdin) != NULL) {
         row.size = strlen(row.data);
         row.number++;
         row.deleted = false;
 
         // Delimiter processing
-        char delimiter = unifyRowDelimiters(&row, (const char **) delimiters);
+        delimiter = unifyRowDelimiters(&row, (const char **) delimiters);
 
         // Validation
         if ((err = verifyRow(&row, delimiter)).error == true) {
@@ -130,11 +132,11 @@ int main(int argc, char **argv) {
         }
 
         // Data processing
-        /*if(row.number == 1) {
+        if(row.number == 1) {
             numberOfColumns = countColumns(&row, delimiter);
-        }*/
+        }
 
-        if ((err = applyTableEditingFunctions(&row, &args/*, delimiter, numberOfColumns*/)).error == true) {
+        if ((err = applyTableEditingFunctions(&row, &args/*, delimiter, &numberOfColumns*/)).error == true) {
             writeErrorMessage(err.message);
 
             return EXIT_FAILURE;
@@ -144,6 +146,9 @@ int main(int argc, char **argv) {
             writeProcessedRow(&row);
         }
     }
+
+    // New content
+    applyAppendRowFunctions(&args, delimiter, numberOfColumns);
 
     return EXIT_SUCCESS;
 }
@@ -160,10 +165,10 @@ void writeProcessedRow(const Row *row) {
 
 /**
  * Writes new row to standard output
- * @param numberOfColumns Number of columns of the new row
  * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns of the new row
  */
-void writeNewRow(int numberOfColumns, char delimiter) {
+void writeNewRow(char delimiter, int numberOfColumns) {
     for (int i = 0; i < numberOfColumns - 1; i++) {
         putchar(delimiter);
     }
@@ -225,27 +230,27 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
 }
 
 /**
- * Processes provided row by other parameters
+ * Applies table editing functions on provided row
  * @param row Input (raw) row
  * @param args Program's input arguments
  * @param delimiters Column delimiter
  * @param numberOfColumns Number of column in each row
  * @return Error information
  */
-ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, char delimiter, int numberOfColumns*/) {
+ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, char delimiter, int *numberOfColumns*/) {
     ErrorInfo errorInfo = {false};
     char *functions[2] = {"drow", "drows"};
     int funcArgs[2] = {1, 2};
 
     // Apply table editing functions
     int numbers[2];
-    for (int i = args->skipped; i < (args->size - 1); i++) {
+    for (int i = args->skipped; i < args->size; i++) {
         // Prepare arguments for functions
         for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
             if (streq(args->data[i], functions[j])) {
                 for (int k = 0; k < funcArgs[j]; k++) {
                     int index = i + k + 1; // Index of argument in InputArguments
-                    if (index > (args->size - 1) || (numbers[k] = toRowColNum(args->data[index])) == INVALID_NUMBER) {
+                    if (index >= args->size || (numbers[k] = toRowColNum(args->data[index])) == INVALID_NUMBER) {
                         errorInfo.error = true;
                         errorInfo.message = "Chybné číslo řádku/sloupce, povolena jsou celá čísla od 1.";
                     }
@@ -269,6 +274,20 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, cha
     }
 
     return errorInfo;
+}
+
+/**
+ * Applies append row functions to output
+ * @param args Program input arguments
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns
+ */
+void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns) {
+    for (int i = args->skipped; i < args->size; i++) {
+        if (streq(args->data[i], "arow")) {
+            writeNewRow(delimiter, numberOfColumns);
+        }
+    }
 }
 
 /**
