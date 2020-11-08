@@ -230,7 +230,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, cha
         for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
             if (streq(args->data[i], functions[j])) {
                 for (int k = 0; k < funcArgs[j]; k++) {
-                    if ((numbers[k] = convertToRowColumnNumber(args->data[i + 1])) == INVALID_NUMBER) {
+                    if ((numbers[k] = convertToRowColumnNumber(args->data[i + (k + 1)])) == INVALID_NUMBER) {
                         errorInfo.error = true;
                         errorInfo.message = "Chybné číslo řádku/sloupce, povolena jsou celá čísla od 1.";
                     }
