@@ -39,11 +39,13 @@
  * @field data Row content
  * @field size Row size (number of contained chars)
  * @field number Row number (from 1)
+ * @field deleted Is the row mark as deleted?
  */
 typedef struct row {
     char data[MAX_ROW_SIZE];
     int size;
     int number;
+    bool deleted;
 } Row;
 /**
  * @typedef Error information tells how some action ended
@@ -72,7 +74,7 @@ void writeErrorMessage(const char *message);
 // Main control and processing
 char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
-/*ErrorInfo processRowData(const InputArguments *args, Row *row, char delimiter, int numberOfColumns);*/
+ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, char delimiter, int numberOfColumns*/);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
@@ -109,6 +111,7 @@ int main(int argc, char **argv) {
     while (fgets(row.data, MAX_ROW_SIZE, stdin) != NULL) {
         row.size = strlen(row.data);
         row.number++;
+        row.deleted = false;
 
         // Delimiter processing
         char delimiter = unifyRowDelimiters(&row, (const char **) delimiters);
@@ -121,17 +124,19 @@ int main(int argc, char **argv) {
         }
 
         // Data processing
-        if(row.number == 1) {
-            /*numberOfColumns =*/ countColumns(&row, delimiter);
-        }
+        /*if(row.number == 1) {
+            numberOfColumns = countColumns(&row, delimiter);
+        }*/
 
-        /*if ((err = processRowData(&args, &row, delimiter, numberOfColumns)).error == true) {
+        if ((err = applyTableEditingFunctions(&row, &args/*, delimiter, numberOfColumns*/)).error == true) {
             writeErrorMessage(err.message);
 
             return EXIT_FAILURE;
-        }*/
+        }
 
-        writeProcessedRow(&row);
+        if (row.deleted == false) {
+            writeProcessedRow(&row);
+        }
     }
 
     return EXIT_SUCCESS;
@@ -154,26 +159,6 @@ void writeProcessedRow(const Row *row) {
 void writeErrorMessage(const char *message) {
     fprintf(stderr, "sheet: %s", message);
 }
-
-/**
- * Processes provided row by other parameters
- * @param args Program's input arguments
- * @param row Input (raw) row
- * @param delimiters Column delimiter
- * @param numberOfColumns Number of column in each row
- * @return Error information
- */
-/*ErrorInfo processRowData(const InputArguments *args, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo = {false};
-
-    // Apply table editing functions
-    int newArgsSize = args->size - args->skipped;
-    for (int i = args->skipped; i < newArgsSize; i++) {
-        // TODO: apply functions from argument on the row
-    }
-
-    return errorInfo;
-}*/
 
 /**
  * Unifies delimiters in provided row - all will be replaced with the first one
@@ -216,6 +201,45 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
         errorInfo.message = "Byla prekrocena maximalni velikost bunky.";
 
         return errorInfo;
+    }
+
+    return errorInfo;
+}
+
+/**
+ * Processes provided row by other parameters
+ * @param row Input (raw) row
+ * @param args Program's input arguments
+ * @param delimiters Column delimiter
+ * @param numberOfColumns Number of column in each row
+ * @return Error information
+ */
+ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args/*, char delimiter, int numberOfColumns*/) {
+    ErrorInfo errorInfo = {false};
+    char *functions[1] = {"drow"};
+    int funcArgs[1] = {1};
+
+    // Apply table editing functions
+    int numbers[2];
+    for (int i = args->skipped; i < (args->size - 1); i++) {
+        for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
+            if (strcmp(args->data[i], functions[j]) == 0) {
+                for (int k = 0; k < funcArgs[j]; k++) {
+                    if ((numbers[k] = convertToRowColumnNumber(args->data[i + 1])) == INVALID_NUMBER) {
+                        errorInfo.error = true;
+                        errorInfo.message = "Chybné číslo řádku/sloupce, povolena jsou celá čísla od 1.";
+                    }
+                }
+            }
+        }
+
+        if (strcmp(args->data[i], "drow") == 0) {
+            if (numbers[0] == row->number) {
+                row->deleted = true;
+
+                return errorInfo; // Doesn't make sense to continue, when the row would be deleted
+            }
+        }
     }
 
     return errorInfo;
