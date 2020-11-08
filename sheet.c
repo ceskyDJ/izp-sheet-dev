@@ -88,6 +88,8 @@ bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
 int toRowColNum(char *value, bool specialAllowed);
+ErrorInfo getColumnValue(char *value, Row *row, int columnNumber, char delimiter);
+ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimiter);
 
 /**
  * Main function
@@ -409,4 +411,66 @@ int toRowColNum(char *value, bool specialAllowed) {
     } else {
         return INVALID_NUMBER;
     }
+}
+
+/**
+ * Returns value of the selected column
+ * @param value Pointer for return value
+ * @param row Row contains the column
+ * @param columnNumber Number of selected column
+ * @param delimiter Column delimiter
+ * @return Error information
+ */
+ErrorInfo getColumnValue(char *value, Row *row, int columnNumber, char delimiter) {
+    // Clean old value
+    for (int i = 0; i < (int)sizeof(value); i++) {
+        value[i] = '\0';
+    }
+
+    // Selected column's offset in row (start of the column)
+    ErrorInfo errorInfo;
+    int offset;
+    if ((errorInfo = getColumnOffset(&offset, row, columnNumber, delimiter)).error == true) {
+        return errorInfo;
+    }
+
+    char c;
+    int i = 0;
+    while ((c = row->data[offset + i]) != delimiter) {
+        value[i] = c;
+
+        i++;
+    }
+
+    return errorInfo;
+}
+
+/**
+ * Returns selected column's offset in his row
+ * @param offset Pointer to save offset from the row beginning
+ * @param row Row contains the column
+ * @param columnNumber Selected column's number
+ * @param delimiter Column delimiter
+ * @return Error information
+ */
+ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimiter) {
+    ErrorInfo errorInfo = {false};
+
+    int counter = 0;
+    for (int i = 0; i < row->size; i++) {
+        if (row->data[i] == delimiter || i == 0) {
+            counter++;
+
+            if (counter == columnNumber) {
+                *offset = (i != 0 ? i + 1 : 0);
+
+                return errorInfo;
+            }
+        }
+    }
+
+    errorInfo.error = true;
+    errorInfo.message = "Sloupec s požadovaným číslem nebyl nalezen.";
+
+    return errorInfo;
 }
