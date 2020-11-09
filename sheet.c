@@ -88,7 +88,7 @@ bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
 int toRowColNum(char *value, bool specialAllowed);
-ErrorInfo getColumnValue(char *value, Row *row, int columnNumber, char delimiter);
+ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
 ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
 ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimiter);
 
@@ -419,31 +419,35 @@ int toRowColNum(char *value, bool specialAllowed) {
 
 /**
  * Returns value of the selected column
- * @param value Pointer for return value
+ * @param value Pointer for return value (value is without '\n')
  * @param row Row contains the column
  * @param columnNumber Number of selected column
  * @param delimiter Column delimiter
  * @return Error information
  */
-ErrorInfo getColumnValue(char *value, Row *row, int columnNumber, char delimiter) {
+ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if (columnNumber > numberOfColumns) {
+        errorInfo.error = true;
+        errorInfo.message = "Sloupec s pozadovanym cislem neexistuje.";
+    }
+
     // Clean old value
-    for (int i = 0; i < (int)sizeof(value); i++) {
+    for (int i = 0; i < MAX_CELL_SIZE; i++) {
         value[i] = '\0';
     }
 
-    // Selected column's offset in row (start of the column)
-    ErrorInfo errorInfo;
-    int offset;
-    if ((errorInfo = getColumnOffset(&offset, row, columnNumber, delimiter)).error == true) {
-        return errorInfo;
-    }
-
-    char c;
-    int i = 0;
-    while ((c = row->data[offset + i]) != delimiter) {
-        value[i] = c;
-
-        i++;
+    int counter = 1;
+    int j = 0;
+    for (int i = 0; i < row->size; i++) {
+        // \n is "delimiter" for the last column
+        if (row->data[i] == delimiter || row->data[i] == '\n') {
+            counter++;
+        } else if (counter == columnNumber) {
+            value[j] = row->data[i];
+            j++;
+        }
     }
 
     return errorInfo;
