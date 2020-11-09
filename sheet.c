@@ -169,7 +169,7 @@ bool loadRow(Row *row) {
     }
 
     // Update structure with new data
-    row->size = strlen(row->data);
+    row->size = (int)strlen(row->data);
     row->number++;
     row->deleted = false;
 
@@ -406,7 +406,7 @@ int toRowColNum(char *value, bool specialAllowed) {
     }
 
     int result;
-    if ((result = strtol(value, NULL, 10)) >= 1) {
+    if ((result = (int)strtol(value, NULL, 10)) >= 1) {
         return result;
     } else {
         return INVALID_NUMBER;
