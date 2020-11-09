@@ -298,6 +298,11 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                 row->data[row->size - 1] = delimiter;
                 row->data[row->size] = '\n';
                 row->size++;
+
+                // Do it only once
+                if (row->number == 1) {
+                    (*numberOfColumns)++;
+                }
             } else {
                 errorInfo.error = true;
                 errorInfo.message = "Provedenim prikazu acol byla prekrocena maximalni velikost radku.";
