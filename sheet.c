@@ -90,7 +90,6 @@ int countColumns(Row *row, char delimiter);
 int toRowColNum(char *value, bool specialAllowed);
 ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
 ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
-ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimiter);
 
 /**
  * Main function
@@ -502,36 +501,6 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
     if (columnNumber == numberOfColumns) {
         row->data[dataIndex] = '\n';
     }
-
-    return errorInfo;
-}
-
-/**
- * Returns selected column's offset in his row
- * @param offset Pointer to save offset from the row beginning
- * @param row Row contains the column
- * @param columnNumber Selected column's number
- * @param delimiter Column delimiter
- * @return Error information
- */
-ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimiter) {
-    ErrorInfo errorInfo = {false};
-
-    int counter = 1;
-    for (int i = 0; i < row->size; i++) {
-        if (counter == columnNumber) {
-            *offset = i;
-
-            return errorInfo;
-        }
-
-        if (row->data[i] == delimiter) {
-            counter++;
-        }
-    }
-
-    errorInfo.error = true;
-    errorInfo.message = "Sloupec s pozadovanym cislem nebyl nalezen.";
 
     return errorInfo;
 }
