@@ -89,7 +89,7 @@ bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
 int toRowColNum(char *value, bool specialAllowed);
 ErrorInfo getColumnValue(char *value, Row *row, int columnNumber, char delimiter);
-ErrorInfo setColumnValue(char *value, Row *row, int columnNumber, char delimiter);
+ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
 ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimiter);
 
 /**
@@ -449,6 +449,59 @@ ErrorInfo getColumnValue(char *value, Row *row, int columnNumber, char delimiter
     return errorInfo;
 }
 
+ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if (columnNumber > numberOfColumns) {
+        errorInfo.error = true;
+        errorInfo.message = "Sloupec s pozadovanym cislem neexistuje.";
+    }
+
+    // Backup row data
+    char rowBackup[MAX_ROW_SIZE];
+    for (int i = 0; i < MAX_ROW_SIZE; i++) {
+        rowBackup[i] = row->data[i];
+    }
+
+    int counter = 1;
+    int backupIndex, dataIndex;
+    for (dataIndex = backupIndex = 0; backupIndex < MAX_ROW_SIZE;) {
+        if (counter == columnNumber) {
+            // Replace row data with new value's content
+            int i = 0;
+            while (value[i] != '\0') {
+                row->data[i + backupIndex] = value[i];
+                i++;
+            }
+            // Move index of row data to a new position (new value can has diff length)
+            dataIndex = backupIndex + i;
+
+            // Delimiter is after the end of normal column, \n is at the end of the last column
+            while (rowBackup[backupIndex] != delimiter && rowBackup[backupIndex] != '\n') {
+                backupIndex++;
+            }
+        }
+
+        // Loading unchanged data from backup
+        row->data[dataIndex] = rowBackup[backupIndex];
+
+        // Mark next column
+        if (rowBackup[backupIndex] == delimiter || rowBackup[backupIndex] == '\n') {
+            counter++;
+        }
+
+        dataIndex++;
+        backupIndex++;
+    }
+
+    // Function removes \n in the last column, so put it back
+    if (columnNumber == numberOfColumns) {
+        row->data[dataIndex] = '\n';
+    }
+
+    return errorInfo;
+}
+
 /**
  * Returns selected column's offset in his row
  * @param offset Pointer to save offset from the row beginning
@@ -477,57 +530,4 @@ ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimite
     errorInfo.message = "Sloupec s pozadovanym cislem nebyl nalezen.";
 
     return errorInfo;
-}
-
-/**
- * Sets value of selected column
- * @param value New value
- * @param row Row contains the column
- * @param columnNumber Selected row's number
- * @param delimiter Column delimiter
- * @return Error information
- */
-ErrorInfo setColumnValue(char *value, Row *row, int columnNumber, char delimiter) {
-    // End offset; function returns index of start of the column, here end of the column is needed
-    ErrorInfo errorInfo;
-    int endOffset;
-    if ((errorInfo = getColumnOffset(&endOffset, row, columnNumber + 1, delimiter)).error == true) {
-        return errorInfo;
-    }
-    endOffset--;
-
-    // Start offset; shouldn't cause error because column with bigger value was found before
-    int startOffset;
-    getColumnOffset(&startOffset, row, columnNumber, delimiter);
-
-    // Create backup of string that will be moved due to change
-    char rowBackup[MAX_ROW_SIZE];
-    for (int i = 0; i < MAX_ROW_SIZE; i++) {
-        rowBackup[i] = row->data[i];
-    }
-
-    // Replace data in row with new column value
-    int endOfEdit = startOffset + (int)strlen(value);
-    for (int i = 0; i < endOfEdit; i++) {
-        row->data[startOffset + i] = value[i];
-    }
-
-    // Revert other data
-    int i = 0;
-    while (rowBackup[endOffset + i] != '\0') {
-        row->data[endOfEdit + i] = rowBackup[endOffset + i];
-        i++;
-    }
-
-    // Update row size
-    if (endOfEdit + i <= MAX_ROW_SIZE) {
-        row->size = endOfEdit + i;
-
-        return errorInfo;
-    } else {
-        errorInfo.error = true;
-        errorInfo.message = "Pri uprave sloupce doslo k prekroceni maximalni velikosti radku.";
-
-        return errorInfo;
-    }
 }
