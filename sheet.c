@@ -260,8 +260,8 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
  */
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
-    char *functions[4] = {"irow", "drow", "drows", "acol"};
-    int funcArgs[4] = {1, 1, 2, 0};
+    char *functions[5] = {"irow", "drow", "drows", "icol", "acol"};
+    int funcArgs[5] = {1, 1, 2, 1, 0};
 
     // Apply table editing functions
     int numbers[2];
@@ -292,12 +292,31 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
             if (row->number >= numbers[0] && row->number <= numbers[1]) {
                 row->deleted = true;
             }
+        } else if (streq(args->data[i], "icol")) {
+            char columnValue[MAX_CELL_SIZE];
+            if ((errorInfo = getColumnValue(columnValue, row, numbers[0], delimiter, *numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+
+            char newColumnValue[MAX_CELL_SIZE];
+            newColumnValue[0] = delimiter;
+            for (int j = 0; j < MAX_CELL_SIZE; j++) {
+                newColumnValue[j + 1] = columnValue[j];
+            }
+
+            // Row should exists - last operation on it ended with success
+            setColumnValue(newColumnValue, row, numbers[0], delimiter, *numberOfColumns);
+
+            // Do it only once
+            if (row->number == 1) {
+                (*numberOfColumns)++;
+            }
         } else if (row->deleted == false && streq(args->data[i], "acol")) {
             if ((row->size + 1) < MAX_ROW_SIZE) {
                 row->data[row->size - 1] = delimiter;
                 row->data[row->size] = '\n';
-                row->size++;
 
+                row->size++;
                 // Do it only once
                 if (row->number == 1) {
                     (*numberOfColumns)++;
