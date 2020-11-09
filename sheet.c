@@ -460,17 +460,16 @@ ErrorInfo getColumnValue(char *value, Row *row, int columnNumber, char delimiter
 ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimiter) {
     ErrorInfo errorInfo = {false};
 
-    int counter = 0;
+    int counter = 1;
     for (int i = 0; i < row->size; i++) {
-        if (row->data[i] == delimiter || i == 0) {
+        if (counter == columnNumber) {
+            *offset = i;
+
+            return errorInfo;
+        }
+
+        if (row->data[i] == delimiter) {
             counter++;
-
-            if (counter == columnNumber) {
-                // First column doesn't have delimiter before (but other have --> + 1 to skip it)
-                *offset = (i != 0 ? i + 1 : 0);
-
-                return errorInfo;
-            }
         }
     }
 
