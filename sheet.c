@@ -502,5 +502,8 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
         row->data[dataIndex] = '\n';
     }
 
+    // Count new size after changes
+    row->size = (int)strlen(row->data);
+
     return errorInfo;
 }
