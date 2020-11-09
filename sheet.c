@@ -182,9 +182,7 @@ bool loadRow(Row *row) {
  * @param row Processed row
  */
 void writeProcessedRow(const Row *row) {
-    for (int i = 0; i < row->size; i++) {
-        putchar(row->data[i]);
-    }
+    printf("%s", row->data);
 }
 
 /**
