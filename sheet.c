@@ -24,7 +24,7 @@
 /**
  * @def DEFAULT_DELIMITER Default delimiter for case user didn't set different
  */
-#define DEFAULT_DELIMITER ""
+#define DEFAULT_DELIMITER " "
 /**
  * @def LAST_ROW_NUMBER Replacement for last row number
  */
