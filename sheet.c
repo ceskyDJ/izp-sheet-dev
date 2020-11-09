@@ -89,6 +89,7 @@ bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
 int toRowColNum(char *value, bool specialAllowed);
 ErrorInfo getColumnValue(char *value, Row *row, int columnNumber, char delimiter);
+ErrorInfo setColumnValue(char *value, Row *row, int columnNumber, char delimiter);
 ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimiter);
 
 /**
@@ -474,4 +475,57 @@ ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimite
     errorInfo.message = "Sloupec s požadovaným číslem nebyl nalezen.";
 
     return errorInfo;
+}
+
+/**
+ * Sets value of selected column
+ * @param value New value
+ * @param row Row contains the column
+ * @param columnNumber Selected row's number
+ * @param delimiter Column delimiter
+ * @return Error information
+ */
+ErrorInfo setColumnValue(char *value, Row *row, int columnNumber, char delimiter) {
+    // End offset; function returns index of start of the column, here end of the column is needed
+    ErrorInfo errorInfo;
+    int endOffset;
+    if ((errorInfo = getColumnOffset(&endOffset, row, columnNumber + 1, delimiter)).error == true) {
+        return errorInfo;
+    }
+    endOffset--;
+
+    // Start offset; shouldn't cause error because column with bigger value was found before
+    int startOffset;
+    getColumnOffset(&startOffset, row, columnNumber, delimiter);
+
+    // Create backup of string that will be moved due to change
+    char rowBackup[MAX_ROW_SIZE];
+    for (int i = 0; i < MAX_ROW_SIZE; i++) {
+        rowBackup[i] = row->data[i];
+    }
+
+    // Replace data in row with new column value
+    int endOfEdit = startOffset + (int)strlen(value);
+    for (int i = 0; i < endOfEdit; i++) {
+        row->data[startOffset + i] = value[i];
+    }
+
+    // Revert other data
+    int i = 0;
+    while (rowBackup[endOffset + i] != '\0') {
+        row->data[endOfEdit + i] = rowBackup[endOffset + i];
+        i++;
+    }
+
+    // Update row size
+    if (endOfEdit + i <= MAX_ROW_SIZE) {
+        row->size = endOfEdit + i;
+
+        return errorInfo;
+    } else {
+        errorInfo.error = true;
+        errorInfo.message = "Při úpravě sloupce došlo k překročení maximální velikosti řádku.";
+
+        return errorInfo;
+    }
 }
