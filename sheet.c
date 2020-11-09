@@ -462,6 +462,7 @@ ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimite
             counter++;
 
             if (counter == columnNumber) {
+                // First column doesn't have delimiter before (but other have --> + 1 to skip it)
                 *offset = (i != 0 ? i + 1 : 0);
 
                 return errorInfo;
