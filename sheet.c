@@ -276,7 +276,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                     int index = i + k + 1; // Index of argument in InputArguments
                     if (index >= args->size || (numbers[k] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
                         errorInfo.error = true;
-                        errorInfo.message = "Chybné číslo řádku/sloupce, povolena jsou celá čísla od 1.";
+                        errorInfo.message = "Chybne cislo radku/sloupce, povolena jsou cela cisla od 1.";
                     }
                 }
             }
@@ -302,7 +302,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                 row->size++;
             } else {
                 errorInfo.error = true;
-                errorInfo.message = "Provedením příkazu acol byla překročena maximální velikost řádku.";
+                errorInfo.message = "Provedenim prikazu acol byla prekrocena maximalni velikost radku.";
 
                 return errorInfo;
             }
@@ -472,7 +472,7 @@ ErrorInfo getColumnOffset(int *offset, Row *row, int columnNumber, char delimite
     }
 
     errorInfo.error = true;
-    errorInfo.message = "Sloupec s požadovaným číslem nebyl nalezen.";
+    errorInfo.message = "Sloupec s pozadovanym cislem nebyl nalezen.";
 
     return errorInfo;
 }
@@ -524,7 +524,7 @@ ErrorInfo setColumnValue(char *value, Row *row, int columnNumber, char delimiter
         return errorInfo;
     } else {
         errorInfo.error = true;
-        errorInfo.message = "Při úpravě sloupce došlo k překročení maximální velikosti řádku.";
+        errorInfo.message = "Pri uprave sloupce doslo k prekroceni maximalni velikosti radku.";
 
         return errorInfo;
     }
