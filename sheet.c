@@ -263,6 +263,11 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
     // Apply table editing functions
     int numbers[2];
     for (int i = args->skipped; i < args->size; i++) {
+        // Arow is valid but not applied here, TODO: make it better
+        if (streq(args->data[i], "arow")) {
+            continue;
+        }
+
         // Prepare arguments for functions
         int j;
         char function[6]; // Selected function
