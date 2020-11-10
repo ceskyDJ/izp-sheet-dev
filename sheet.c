@@ -84,6 +84,7 @@ ErrorInfo verifyRow(const Row *row, char delimiter);
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
 // Help functions
+void dcols(int from, int to, Row *row, char delimiter);
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
@@ -326,35 +327,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                 numbers[1] = numbers[0];
             }
 
-            // Backup for future recovery + clean row
-            char rowBackup[MAX_ROW_SIZE];
-            memmove(rowBackup, row->data, MAX_ROW_SIZE);
-            memset(row->data, '\0', MAX_ROW_SIZE);
-
-            // Recovery only data of non-deleted columns
-            int counter = 1; // Actual number of column, column numbering starts from 1
-            int dataIndex = 0;
-            for (int j = 0; j < row->size; j++) {
-                if (!(counter >= numbers[0] && counter <= numbers[1])) {
-                    row->data[dataIndex] = rowBackup[j];
-                    dataIndex++;
-                } else if (j == (row->size - 1)) {
-                    // The last column is being removed, so end delimiter must be deleted
-                    dataIndex--;
-                    row->data[dataIndex] = '\0';
-                }
-
-                if(rowBackup[j] == delimiter) {
-                    counter++;
-                }
-            }
-
-            // Recount row's size and ensure \n at the end of the row
-            row->size = (int)strlen(row->data);
-            if (row->data[row->size - 1] != '\n') {
-                row->data[row->size] = '\n';
-                row->size++;
-            }
+            dcols(numbers[0], numbers[1], row, delimiter);
         }
     }
 
@@ -372,6 +345,45 @@ void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfC
         if (streq(args->data[i], "arow")) {
             writeNewRow(delimiter, numberOfColumns);
         }
+    }
+}
+
+/**
+ * Deletes row's columns from selected range
+ * @param from First selected column number
+ * @param to Last selected column number
+ * @param row Operated row
+ * @param delimiter Column delimiter
+ */
+void dcols(int from, int to, Row *row, char delimiter) {
+    // Backup for future recovery + clean row
+    char rowBackup[MAX_ROW_SIZE];
+    memmove(rowBackup, row->data, MAX_ROW_SIZE);
+    memset(row->data, '\0', MAX_ROW_SIZE);
+
+    // Recovery only data of non-deleted columns
+    int counter = 1; // Actual number of column, column numbering starts from 1
+    int dataIndex = 0;
+    for (int j = 0; j < row->size; j++) {
+        if (!(counter >= from && counter <= to)) {
+            row->data[dataIndex] = rowBackup[j];
+            dataIndex++;
+        } else if (j == (row->size - 1)) {
+            // The last column is being removed, so end delimiter must be deleted
+            dataIndex--;
+            row->data[dataIndex] = '\0';
+        }
+
+        if(rowBackup[j] == delimiter) {
+            counter++;
+        }
+    }
+
+    // Recount row's size and ensure \n at the end of the row
+    row->size = (int)strlen(row->data);
+    if (row->data[row->size - 1] != '\n') {
+        row->data[row->size] = '\n';
+        row->size++;
     }
 }
 
