@@ -327,6 +327,13 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                 numbers[1] = numbers[0];
             }
 
+            if (numbers[0] > numbers[1]) {
+                errorInfo.error = true;
+                errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
+
+                return errorInfo;
+            }
+
             dcols(numbers[0], numbers[1], row, delimiter);
         }
     }
