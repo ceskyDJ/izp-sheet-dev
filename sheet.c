@@ -271,6 +271,8 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                     if (index >= args->size || (numbers[k] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
                         errorInfo.error = true;
                         errorInfo.message = "Chybne cislo radku/sloupce, povolena jsou cela cisla od 1.";
+
+                        return errorInfo;
                     }
                 }
             }
