@@ -286,6 +286,13 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                 row->deleted = true;
             }
         } else if (streq(args->data[i], "drows")) {
+            if (numbers[0] > numbers[1]) {
+                errorInfo.error = true;
+                errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
+
+                return errorInfo;
+            }
+
             if (row->number >= numbers[0] && row->number <= numbers[1]) {
                 row->deleted = true;
             }
