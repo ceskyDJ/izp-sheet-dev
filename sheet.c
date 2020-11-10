@@ -256,8 +256,8 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
  */
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
-    char *functions[5] = {"irow", "drow", "drows", "icol", "acol"};
-    int funcArgs[5] = {1, 1, 2, 1, 0};
+    char *functions[7] = {"irow", "drow", "drows", "icol", "acol", "dcol", "dcols"};
+    int funcArgs[7] = {1, 1, 2, 1, 0, 1, 2};
 
     // Apply table editing functions
     int numbers[2];
@@ -309,8 +309,8 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
             if ((row->size + 1) < MAX_ROW_SIZE) {
                 row->data[row->size - 1] = delimiter;
                 row->data[row->size] = '\n';
-
                 row->size++;
+
                 // Do it only once
                 if (row->number == 1) {
                     (*numberOfColumns)++;
@@ -320,6 +320,40 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                 errorInfo.message = "Provedenim prikazu acol byla prekrocena maximalni velikost radku.";
 
                 return errorInfo;
+            }
+        } else if (row->deleted == false && (streq(args->data[i], "dcol") || streq(args->data[i], "dcols"))) {
+            if (streq(args->data[i], "dcol")) {
+                numbers[1] = numbers[0];
+            }
+
+            // Backup for future recovery + clean row
+            char rowBackup[MAX_ROW_SIZE];
+            memmove(rowBackup, row->data, MAX_ROW_SIZE);
+            memset(row->data, '\0', MAX_ROW_SIZE);
+
+            // Recovery only data of non-deleted columns
+            int counter = 1; // Actual number of column, column numbering starts from 1
+            int dataIndex = 0;
+            for (int j = 0; j < row->size; j++) {
+                if (!(counter >= numbers[0] && counter <= numbers[1])) {
+                    row->data[dataIndex] = rowBackup[j];
+                    dataIndex++;
+                } else if (j == (row->size - 1)) {
+                    // The last column is being removed, so end delimiter must be deleted
+                    dataIndex--;
+                    row->data[dataIndex] = '\0';
+                }
+
+                if(rowBackup[j] == delimiter) {
+                    counter++;
+                }
+            }
+
+            // Recount row's size and ensure \n at the end of the row
+            row->size = (int)strlen(row->data);
+            if (row->data[row->size - 1] != '\n') {
+                row->data[row->size] = '\n';
+                row->size++;
             }
         }
     }
@@ -482,7 +516,7 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
             // Replace row data with new value's content
             int i = 0;
             while (value[i] != '\0') {
-                row->data[i + backupIndex] = value[i];
+                row->data[i + dataIndex] = value[i];
                 i++;
             }
             // Move index of row data to a new position (new value can has diff length)
