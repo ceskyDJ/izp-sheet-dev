@@ -296,9 +296,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
 
             char newColumnValue[MAX_CELL_SIZE];
             newColumnValue[0] = delimiter;
-            for (int j = 0; j < MAX_CELL_SIZE; j++) {
-                newColumnValue[j + 1] = columnValue[j];
-            }
+            strcat(newColumnValue, columnValue);
 
             // Row should exists - last operation on it ended with success
             setColumnValue(newColumnValue, row, numbers[0], delimiter, *numberOfColumns);
