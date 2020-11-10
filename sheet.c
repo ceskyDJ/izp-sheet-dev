@@ -264,8 +264,12 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
     int numbers[2];
     for (int i = args->skipped; i < args->size; i++) {
         // Prepare arguments for functions
-        for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
+        int j;
+        char function[6]; // Selected function
+        for (j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
             if (streq(args->data[i], functions[j])) {
+                strcpy(function, functions[j]);
+
                 for (int k = 0; k < funcArgs[j]; k++) {
                     int index = i + k + 1; // Index of argument in InputArguments
                     if (index >= args->size || (numbers[k] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
@@ -275,19 +279,26 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                         return errorInfo;
                     }
                 }
+
+                // Move iterator of arguments array by function arguments
+                i += funcArgs[j];
+                // Function was found, doesn't make sense to continue searching
+                break;
+            } else {
+                memset(function, '\0', sizeof(function));
             }
         }
 
         // Column-operated functions are skipped if the row is set as deleted - it doesn't make sense to apply them
-        if (streq(args->data[i], "irow")) {
+        if (streq(function, "irow")) {
             if (row->number == numbers[0]) {
                 writeNewRow(delimiter, *numberOfColumns);
             }
-        } else if (streq(args->data[i], "drow")) {
+        } else if (streq(function, "drow")) {
             if (row->number == numbers[0]) {
                 row->deleted = true;
             }
-        } else if (streq(args->data[i], "drows")) {
+        } else if (streq(function, "drows")) {
             if (numbers[0] > numbers[1]) {
                 errorInfo.error = true;
                 errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
@@ -298,7 +309,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
             if (row->number >= numbers[0] && row->number <= numbers[1]) {
                 row->deleted = true;
             }
-        } else if (streq(args->data[i], "icol")) {
+        } else if (streq(function, "icol")) {
             char columnValue[MAX_CELL_SIZE];
             if ((errorInfo = getColumnValue(columnValue, row, numbers[0], delimiter, *numberOfColumns)).error == true) {
                 return errorInfo;
@@ -315,7 +326,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
             if (row->number == 1) {
                 (*numberOfColumns)++;
             }
-        } else if (row->deleted == false && streq(args->data[i], "acol")) {
+        } else if (row->deleted == false && streq(function, "acol")) {
             if ((row->size + 1) < MAX_ROW_SIZE) {
                 row->data[row->size - 1] = delimiter;
                 row->data[row->size] = '\n';
@@ -331,8 +342,8 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
 
                 return errorInfo;
             }
-        } else if (row->deleted == false && (streq(args->data[i], "dcol") || streq(args->data[i], "dcols"))) {
-            if (streq(args->data[i], "dcol")) {
+        } else if (row->deleted == false && (streq(function, "dcol") || streq(function, "dcols"))) {
+            if (streq(function, "dcol")) {
                 numbers[1] = numbers[0];
             }
 
@@ -344,6 +355,11 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
             }
 
             dcols(numbers[0], numbers[1], row, delimiter);
+        } else {
+            errorInfo.error = true;
+            errorInfo.message = "Neplatny nazev funkce.";
+
+            return errorInfo;
         }
     }
 
