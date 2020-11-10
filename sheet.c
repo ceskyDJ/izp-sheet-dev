@@ -158,12 +158,8 @@ int main(int argc, char **argv) {
  * @return Was it successful? If false, no other input is available.
  */
 bool loadRow(Row *row) {
-    // Delete old data; Size of old row instance is used => first row won't be iterated
-    for (int i = 0; i < row->size; i++) {
-        row->data[i] = '\0';
-    }
-
     // Try to load new data for the new row; if unsuccessful return false
+    memset(row->data, '\0', row->size);
     if (fgets(row->data, MAX_ROW_SIZE, stdin) == NULL) {
         return false;
     }
@@ -451,13 +447,9 @@ ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char del
         errorInfo.message = "Sloupec s pozadovanym cislem neexistuje.";
     }
 
-    // Clean old value
-    for (int i = 0; i < MAX_CELL_SIZE; i++) {
-        value[i] = '\0';
-    }
-
     int counter = 1;
     int j = 0;
+    memset(value, '\0', MAX_CELL_SIZE);
     for (int i = 0; i < row->size; i++) {
         // \n is "delimiter" for the last column
         if (row->data[i] == delimiter || row->data[i] == '\n') {
