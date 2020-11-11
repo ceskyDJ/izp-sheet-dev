@@ -83,8 +83,10 @@ char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
-// Help functions
+// Table editing functions
+ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns);
 void dcols(int from, int to, Row *row, char delimiter);
+// Help functions
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
@@ -315,21 +317,8 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                 row->deleted = true;
             }
         } else if (streq(function, "icol")) {
-            char columnValue[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(columnValue, row, numbers[0], delimiter, *numberOfColumns)).error == true) {
+            if ((errorInfo = icol(numbers[0], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
-            }
-
-            char newColumnValue[MAX_CELL_SIZE];
-            newColumnValue[0] = delimiter;
-            strcat(newColumnValue, columnValue);
-
-            // Row should exists - last operation on it ended with success
-            setColumnValue(newColumnValue, row, numbers[0], delimiter, *numberOfColumns);
-
-            // Do it only once
-            if (row->number == 1) {
-                (*numberOfColumns)++;
             }
         } else if (row->deleted == false && streq(function, "acol")) {
             if ((row->size + 1) < MAX_ROW_SIZE) {
@@ -383,6 +372,38 @@ void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfC
             writeNewRow(delimiter, numberOfColumns);
         }
     }
+}
+
+/**
+ * Adds column before selected column
+ * @param column Selected column
+ * @param row Row to change
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    char columnValue[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(columnValue, row, column, delimiter, *numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    char newColumnValue[MAX_CELL_SIZE];
+    memset(newColumnValue, '\0', sizeof(newColumnValue));
+    newColumnValue[0] = delimiter;
+    strcat(newColumnValue, columnValue);
+
+    // Row should exists - last operation on it ended with success
+    setColumnValue(newColumnValue, row, column, delimiter, *numberOfColumns);
+
+    // Do it only once
+    if (row->number == 1) {
+        (*numberOfColumns)++;
+    }
+
+    return errorInfo;
 }
 
 /**
