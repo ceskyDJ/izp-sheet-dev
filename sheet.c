@@ -72,6 +72,15 @@ typedef struct inputArguments {
     int size;
     int skipped;
 } InputArguments;
+/**
+ * @typedef Program defined function
+ * @field name Name of the function
+ * @field params Parameters' values required by function
+ */
+typedef struct function {
+    char name[8];
+    int params[4];
+} Function;
 
 // Input/Output functions
 bool loadRow(Row *row);
@@ -83,11 +92,16 @@ char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
+// Table editing functions
+ErrorInfo drows(int from, int to, Row *row);
+ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns);
+ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
+ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 // Help functions
-void dcols(int from, int to, Row *row, char delimiter);
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
+ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, int *position);
 int toRowColNum(char *value, bool specialAllowed);
 ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
 ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
@@ -257,114 +271,42 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
  */
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
-    char *functions[7] = {"irow", "drow", "drows", "icol", "acol", "dcol", "dcols"};
-    int funcArgs[7] = {1, 1, 2, 1, 0, 1, 2};
 
-    // Apply table editing functions
-    int numbers[2];
     for (int i = args->skipped; i < args->size; i++) {
-        // Arow is valid but not applied here, TODO: make it better
-        if (streq(args->data[i], "arow")) {
-            continue;
-        }
-
-        // Prepare arguments for functions
-        int j;
-        char function[6]; // Selected function
-        for (j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
-            if (streq(args->data[i], functions[j])) {
-                strcpy(function, functions[j]);
-
-                for (int k = 0; k < funcArgs[j]; k++) {
-                    int index = i + k + 1; // Index of argument in InputArguments
-                    if (index >= args->size || (numbers[k] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
-                        errorInfo.error = true;
-                        errorInfo.message = "Chybne cislo radku/sloupce, povolena jsou cela cisla od 1.";
-
-                        return errorInfo;
-                    }
-                }
-
-                // Move iterator of arguments array by function arguments
-                i += funcArgs[j];
-                // Function was found, doesn't make sense to continue searching
-                break;
-            } else {
-                memset(function, '\0', sizeof(function));
-            }
+        Function function;
+        if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
+            return errorInfo;
         }
 
         // Column-operated functions are skipped if the row is set as deleted - it doesn't make sense to apply them
-        if (streq(function, "irow")) {
-            if (row->number == numbers[0]) {
+        if (streq(function.name, "irow")) {
+            if (row->number == function.params[0]) {
                 writeNewRow(delimiter, *numberOfColumns);
             }
-        } else if (streq(function, "drow")) {
-            if (row->number == numbers[0]) {
-                row->deleted = true;
+        } else if (streq(function.name, "drow") || streq(function.name, "drows")) {
+            if (streq(function.name, "drow")) {
+                function.params[1] = function.params[0];
             }
-        } else if (streq(function, "drows")) {
-            if (numbers[0] > numbers[1]) {
-                errorInfo.error = true;
-                errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
 
+            if ((errorInfo = drows(function.params[0], function.params[1], row)).error == true) {
                 return errorInfo;
             }
-
-            if (row->number >= numbers[0] && row->number <= numbers[1]) {
-                row->deleted = true;
-            }
-        } else if (streq(function, "icol")) {
-            char columnValue[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(columnValue, row, numbers[0], delimiter, *numberOfColumns)).error == true) {
+        } else if (streq(function.name, "icol")) {
+            if ((errorInfo = icol(function.params[0], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-
-            char newColumnValue[MAX_CELL_SIZE];
-            newColumnValue[0] = delimiter;
-            strcat(newColumnValue, columnValue);
-
-            // Row should exists - last operation on it ended with success
-            setColumnValue(newColumnValue, row, numbers[0], delimiter, *numberOfColumns);
-
-            // Do it only once
-            if (row->number == 1) {
-                (*numberOfColumns)++;
-            }
-        } else if (row->deleted == false && streq(function, "acol")) {
-            if ((row->size + 1) < MAX_ROW_SIZE) {
-                row->data[row->size - 1] = delimiter;
-                row->data[row->size] = '\n';
-                row->size++;
-
-                // Do it only once
-                if (row->number == 1) {
-                    (*numberOfColumns)++;
-                }
-            } else {
-                errorInfo.error = true;
-                errorInfo.message = "Provedenim prikazu acol byla prekrocena maximalni velikost radku.";
-
+        } else if (row->deleted == false && streq(function.name, "acol")) {
+            if ((errorInfo = acol(row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-        } else if (row->deleted == false && (streq(function, "dcol") || streq(function, "dcols"))) {
-            if (streq(function, "dcol")) {
-                numbers[1] = numbers[0];
+        } else if (row->deleted == false && (streq(function.name, "dcol") || streq(function.name, "dcols"))) {
+            if (streq(function.name, "dcol")) {
+                function.params[1] = function.params[0];
             }
 
-            if (numbers[0] > numbers[1]) {
-                errorInfo.error = true;
-                errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
-
+            if ((errorInfo = dcols(function.params[0], function.params[1], row, delimiter)).error == true) {
                 return errorInfo;
             }
-
-            dcols(numbers[0], numbers[1], row, delimiter);
-        } else {
-            errorInfo.error = true;
-            errorInfo.message = "Neplatny nazev funkce.";
-
-            return errorInfo;
         }
     }
 
@@ -386,13 +328,108 @@ void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfC
 }
 
 /**
+ * Marks rows from selected interval as deleted
+ * @param from First selected row
+ * @param to Last selected row
+ * @param row Actual row
+ * @return Error information
+ */
+ErrorInfo drows(int from, int to, Row *row) {
+    ErrorInfo errorInfo = {false};
+
+    if (from > to) {
+        errorInfo.error = true;
+        errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
+
+        return errorInfo;
+    }
+
+    if (row->number >= from && row->number <= to) {
+        row->deleted = true;
+    }
+
+    return errorInfo;
+}
+
+/**
+ * Adds column before selected column
+ * @param column Selected column
+ * @param row Row to change
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    char columnValue[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(columnValue, row, column, delimiter, *numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    char newColumnValue[MAX_CELL_SIZE];
+    memset(newColumnValue, '\0', sizeof(newColumnValue));
+    newColumnValue[0] = delimiter;
+    strcat(newColumnValue, columnValue);
+
+    // Row should exists - last operation on it ended with success
+    setColumnValue(newColumnValue, row, column, delimiter, *numberOfColumns);
+
+    // Do it only once
+    if (row->number == 1) {
+        (*numberOfColumns)++;
+    }
+
+    return errorInfo;
+}
+
+/**
+ * Append column to the end of the row
+ * @param row Row to change
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error info
+ */
+ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if ((row->size + 1) > MAX_ROW_SIZE) {
+        errorInfo.error = true;
+        errorInfo.message = "Provedenim prikazu acol byla prekrocena maximalni velikost radku.";
+
+        return errorInfo;
+    }
+
+    row->data[row->size - 1] = delimiter;
+    row->data[row->size] = '\n';
+    row->size++;
+
+    // Do it only once
+    if (row->number == 1) {
+        (*numberOfColumns)++;
+    }
+
+    return errorInfo;
+}
+
+/**
  * Deletes row's columns from selected range
  * @param from First selected column number
  * @param to Last selected column number
  * @param row Operated row
  * @param delimiter Column delimiter
+ * @return Error information
  */
-void dcols(int from, int to, Row *row, char delimiter) {
+ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
+    ErrorInfo errorInfo = {false};
+
+    if (from > to) {
+        errorInfo.error = true;
+        errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
+
+        return errorInfo;
+    }
+
     // Backup for future recovery + clean row
     char rowBackup[MAX_ROW_SIZE];
     memmove(rowBackup, row->data, MAX_ROW_SIZE);
@@ -422,6 +459,8 @@ void dcols(int from, int to, Row *row, char delimiter) {
         row->data[row->size] = '\n';
         row->size++;
     }
+
+    return errorInfo;
 }
 
 /**
@@ -493,6 +532,49 @@ int countColumns(Row *row, char delimiter) {
 }
 
 /**
+ * Extract function from program input arguments
+ * @param function Pointer for save found function
+ * @param args Input program arguments
+ * @param position Actual position in input program arguments
+ * @return Error information
+ */
+ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, int *position) {
+    ErrorInfo errorInfo = {false};
+    char *functions[8] = {"arow", "irow", "drow", "drows", "icol", "acol", "dcol", "dcols"};
+    int funcArgs[8] = {0, 1, 1, 2, 1, 0, 1, 2};
+
+    // Prepare arguments for functions
+    for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
+        if (streq(args->data[*position], functions[j])) {
+            strcpy(function->name, functions[j]);
+
+            for (int i = 0; i < funcArgs[j]; i++) {
+                int index = *position + i + 1; // Index of argument in InputArguments
+                if (index >= args->size || (function->params[i] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
+                    errorInfo.error = true;
+                    errorInfo.message = "Chybne cislo radku/sloupce, povolena jsou cela cisla od 1.";
+
+                    return errorInfo;
+                }
+            }
+
+            // Move iterator of arguments array by function arguments
+            *position += funcArgs[j];
+            // Function was found, doesn't make sense to continue searching
+            return errorInfo;
+        } else {
+            memset(function->name, '\0', sizeof(function->name));
+        }
+    }
+
+    // Function not found --> function name must be bad
+    errorInfo.error = true;
+    errorInfo.message = "Neplatny nazev funkce.";
+
+    return errorInfo;
+}
+
+/**
  * Converts string to row/column number
  * @param value String with expected row/column number
  * @param specialAllowed Is special state allowed? ('-' for last row)
@@ -544,6 +626,15 @@ ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char del
     return errorInfo;
 }
 
+/**
+ * Sets value of selected column
+ * @param value New column's value
+ * @param row Row contains the column
+ * @param columnNumber Column's number
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error information
+ */
 ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns) {
     ErrorInfo errorInfo = {false};
 
