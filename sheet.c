@@ -544,6 +544,15 @@ ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char del
     return errorInfo;
 }
 
+/**
+ * Sets value of selected column
+ * @param value New column's value
+ * @param row Row contains the column
+ * @param columnNumber Column's number
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error information
+ */
 ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns) {
     ErrorInfo errorInfo = {false};
 
