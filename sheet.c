@@ -72,6 +72,15 @@ typedef struct inputArguments {
     int size;
     int skipped;
 } InputArguments;
+/**
+ * @typedef Program defined function
+ * @field name Name of the function
+ * @field params Parameters' values required by function
+ */
+typedef struct function {
+    char name[8];
+    int params[4];
+} Function;
 
 // Input/Output functions
 bool loadRow(Row *row);
@@ -92,6 +101,7 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
+ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, int *position);
 int toRowColNum(char *value, bool specialAllowed);
 ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
 ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
@@ -261,70 +271,40 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
  */
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
-    char *functions[7] = {"irow", "drow", "drows", "icol", "acol", "dcol", "dcols"};
-    int funcArgs[7] = {1, 1, 2, 1, 0, 1, 2};
 
-    // Apply table editing functions
-    int numbers[2];
     for (int i = args->skipped; i < args->size; i++) {
-        // Arow is valid but not applied here, TODO: make it better
-        if (streq(args->data[i], "arow")) {
-            continue;
-        }
-
-        // Prepare arguments for functions
-        int j;
-        char function[6]; // Selected function
-        for (j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
-            if (streq(args->data[i], functions[j])) {
-                strcpy(function, functions[j]);
-
-                for (int k = 0; k < funcArgs[j]; k++) {
-                    int index = i + k + 1; // Index of argument in InputArguments
-                    if (index >= args->size || (numbers[k] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
-                        errorInfo.error = true;
-                        errorInfo.message = "Chybne cislo radku/sloupce, povolena jsou cela cisla od 1.";
-
-                        return errorInfo;
-                    }
-                }
-
-                // Move iterator of arguments array by function arguments
-                i += funcArgs[j];
-                // Function was found, doesn't make sense to continue searching
-                break;
-            } else {
-                memset(function, '\0', sizeof(function));
-            }
+        Function function;
+        if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
+            return errorInfo;
         }
 
         // Column-operated functions are skipped if the row is set as deleted - it doesn't make sense to apply them
-        if (streq(function, "irow")) {
-            if (row->number == numbers[0]) {
+        if (streq(function.name, "irow")) {
+            if (row->number == function.params[0]) {
                 writeNewRow(delimiter, *numberOfColumns);
             }
-        } else if (streq(function, "drow") || streq(function, "drows")) {
-            if (streq(function, "drow")) {
-                numbers[1] = numbers[0];
+        } else if (streq(function.name, "drow") || streq(function.name, "drows")) {
+            if (streq(function.name, "drow")) {
+                function.params[1] = function.params[0];
             }
 
-            if ((errorInfo = drows(numbers[0], numbers[1], row)).error == true) {
+            if ((errorInfo = drows(function.params[0], function.params[1], row)).error == true) {
                 return errorInfo;
             }
-        } else if (streq(function, "icol")) {
-            if ((errorInfo = icol(numbers[0], row, delimiter, numberOfColumns)).error == true) {
+        } else if (streq(function.name, "icol")) {
+            if ((errorInfo = icol(function.params[0], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-        } else if (row->deleted == false && streq(function, "acol")) {
+        } else if (row->deleted == false && streq(function.name, "acol")) {
             if ((errorInfo = acol(row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-        } else if (row->deleted == false && (streq(function, "dcol") || streq(function, "dcols"))) {
-            if (streq(function, "dcol")) {
-                numbers[1] = numbers[0];
+        } else if (row->deleted == false && (streq(function.name, "dcol") || streq(function.name, "dcols"))) {
+            if (streq(function.name, "dcol")) {
+                function.params[1] = function.params[0];
             }
 
-            if ((errorInfo = dcols(numbers[0], numbers[1], row, delimiter)).error == true) {
+            if ((errorInfo = dcols(function.params[0], function.params[1], row, delimiter)).error == true) {
                 return errorInfo;
             }
         } else {
@@ -554,6 +534,45 @@ int countColumns(Row *row, char delimiter) {
     }
 
     return counter;
+}
+
+/**
+ * Extract function from program input arguments
+ * @param function Pointer for save found function
+ * @param args Input program arguments
+ * @param position Actual position in input program arguments
+ * @return Error information
+ */
+ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, int *position) {
+    ErrorInfo errorInfo = {false};
+    char *functions[8] = {"arow", "irow", "drow", "drows", "icol", "acol", "dcol", "dcols"};
+    int funcArgs[8] = {0, 1, 1, 2, 1, 0, 1, 2};
+
+    // Prepare arguments for functions
+    for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
+        if (streq(args->data[*position], functions[j])) {
+            strcpy(function->name, functions[j]);
+
+            for (int i = 0; i < funcArgs[j]; i++) {
+                int index = *position + i + 1; // Index of argument in InputArguments
+                if (index >= args->size || (function->params[i] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
+                    errorInfo.error = true;
+                    errorInfo.message = "Chybne cislo radku/sloupce, povolena jsou cela cisla od 1.";
+
+                    return errorInfo;
+                }
+            }
+
+            // Move iterator of arguments array by function arguments
+            *position += funcArgs[j];
+            // Function was found, doesn't make sense to continue searching
+            break;
+        } else {
+            memset(function->name, '\0', sizeof(function->name));
+        }
+    }
+
+    return errorInfo;
 }
 
 /**
