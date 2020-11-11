@@ -84,6 +84,7 @@ ErrorInfo verifyRow(const Row *row, char delimiter);
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
 // Table editing functions
+ErrorInfo drows(int from, int to, Row *row);
 ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
 void dcols(int from, int to, Row *row, char delimiter);
@@ -302,20 +303,13 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
             if (row->number == numbers[0]) {
                 writeNewRow(delimiter, *numberOfColumns);
             }
-        } else if (streq(function, "drow")) {
-            if (row->number == numbers[0]) {
-                row->deleted = true;
+        } else if (streq(function, "drow") || streq(function, "drows")) {
+            if (streq(function, "drow")) {
+                numbers[1] = numbers[0];
             }
-        } else if (streq(function, "drows")) {
-            if (numbers[0] > numbers[1]) {
-                errorInfo.error = true;
-                errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
 
+            if ((errorInfo = drows(numbers[0], numbers[1], row)).error == true) {
                 return errorInfo;
-            }
-
-            if (row->number >= numbers[0] && row->number <= numbers[1]) {
-                row->deleted = true;
             }
         } else if (streq(function, "icol")) {
             if ((errorInfo = icol(numbers[0], row, delimiter, numberOfColumns)).error == true) {
@@ -361,6 +355,30 @@ void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfC
             writeNewRow(delimiter, numberOfColumns);
         }
     }
+}
+
+/**
+ * Marks rows from selected interval as deleted
+ * @param from First selected row
+ * @param to Last selected row
+ * @param row Actual row
+ * @return Error information
+ */
+ErrorInfo drows(int from, int to, Row *row) {
+    ErrorInfo errorInfo = {false};
+
+    if (from > to) {
+        errorInfo.error = true;
+        errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
+
+        return errorInfo;
+    }
+
+    if (row->number >= from && row->number <= to) {
+        row->deleted = true;
+    }
+
+    return errorInfo;
 }
 
 /**
