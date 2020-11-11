@@ -85,6 +85,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
 // Table editing functions
 ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns);
+ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
 void dcols(int from, int to, Row *row, char delimiter);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
@@ -321,19 +322,7 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                 return errorInfo;
             }
         } else if (row->deleted == false && streq(function, "acol")) {
-            if ((row->size + 1) < MAX_ROW_SIZE) {
-                row->data[row->size - 1] = delimiter;
-                row->data[row->size] = '\n';
-                row->size++;
-
-                // Do it only once
-                if (row->number == 1) {
-                    (*numberOfColumns)++;
-                }
-            } else {
-                errorInfo.error = true;
-                errorInfo.message = "Provedenim prikazu acol byla prekrocena maximalni velikost radku.";
-
+            if ((errorInfo = acol(row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
         } else if (row->deleted == false && (streq(function, "dcol") || streq(function, "dcols"))) {
@@ -397,6 +386,35 @@ ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns) {
 
     // Row should exists - last operation on it ended with success
     setColumnValue(newColumnValue, row, column, delimiter, *numberOfColumns);
+
+    // Do it only once
+    if (row->number == 1) {
+        (*numberOfColumns)++;
+    }
+
+    return errorInfo;
+}
+
+/**
+ * Append column to the end of the row
+ * @param row Row to change
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error info
+ */
+ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if ((row->size + 1) > MAX_ROW_SIZE) {
+        errorInfo.error = true;
+        errorInfo.message = "Provedenim prikazu acol byla prekrocena maximalni velikost radku.";
+
+        return errorInfo;
+    }
+
+    row->data[row->size - 1] = delimiter;
+    row->data[row->size] = '\n';
+    row->size++;
 
     // Do it only once
     if (row->number == 1) {
