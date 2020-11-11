@@ -24,26 +24,33 @@
 /**
  * @def DEFAULT_DELIMITER Default delimiter for case user didn't set different
  */
-#define DEFAULT_DELIMITER ""
+#define DEFAULT_DELIMITER " "
 /**
- * @def ANY_NUMBER Numeric representation of '-' state (any row/column number)
+ * @def LAST_ROW_NUMBER Replacement for last row number
  */
-#define ANY_NUMBER 0
+#define LAST_ROW_NUMBER 0
 /**
  * @def INVALID_NUMBER Invalid number of row/column provided in input arguments
  */
 #define INVALID_NUMBER -1
 
 /**
+ * @def streq(first, second) Check if first equals second
+ */
+#define streq(first, second) strcmp(first, second) == 0
+
+/**
  * @typedef Row Individual row for processing
  * @field data Row content
  * @field size Row size (number of contained chars)
  * @field number Row number (from 1)
+ * @field deleted Is the row mark as deleted?
  */
 typedef struct row {
     char data[MAX_ROW_SIZE];
     int size;
     int number;
+    bool deleted;
 } Row;
 /**
  * @typedef Error information tells how some action ended
@@ -66,18 +73,24 @@ typedef struct inputArguments {
     int skipped;
 } InputArguments;
 
-// Output functions
+// Input/Output functions
+bool loadRow(Row *row);
 void writeProcessedRow(const Row *row);
+void writeNewRow(char delimiter, int numberOfColumns);
 void writeErrorMessage(const char *message);
 // Main control and processing
 char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
-/*ErrorInfo processRowData(const InputArguments *args, Row *row, char delimiter, int numberOfColumns);*/
+ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
+void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
 // Help functions
+void dcols(int from, int to, Row *row, char delimiter);
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
-int convertToRowColumnNumber(char *value);
+int toRowColNum(char *value, bool specialAllowed);
+ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
+ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
 
 /**
  * Main function
@@ -93,7 +106,7 @@ int main(int argc, char **argv) {
     // Delimiters
     char **delimiters;
     if (argc >= 3) {
-        if (strcmp(args.data[args.skipped], "-d") == 0) {
+        if (streq(args.data[args.skipped], "-d")) {
             delimiters = &args.data[args.skipped + 1];
             args.skipped += 2;
         }
@@ -104,14 +117,12 @@ int main(int argc, char **argv) {
 
     /* ROW PARSING */
     ErrorInfo err;
-    Row row = {.number = 0};
-    /*int numberOfColumns;*/
-    while (fgets(row.data, MAX_ROW_SIZE, stdin) != NULL) {
-        row.size = strlen(row.data);
-        row.number++;
-
+    Row row = {.size = 0, .number = 0};
+    char delimiter;
+    int numberOfColumns;
+    while (loadRow(&row) == true) {
         // Delimiter processing
-        char delimiter = unifyRowDelimiters(&row, (const char **) delimiters);
+        delimiter = unifyRowDelimiters(&row, (const char **) delimiters);
 
         // Validation
         if ((err = verifyRow(&row, delimiter)).error == true) {
@@ -122,19 +133,44 @@ int main(int argc, char **argv) {
 
         // Data processing
         if(row.number == 1) {
-            /*numberOfColumns =*/ countColumns(&row, delimiter);
+            numberOfColumns = countColumns(&row, delimiter);
         }
 
-        /*if ((err = processRowData(&args, &row, delimiter, numberOfColumns)).error == true) {
+        if ((err = applyTableEditingFunctions(&row, &args, delimiter, &numberOfColumns)).error == true) {
             writeErrorMessage(err.message);
 
             return EXIT_FAILURE;
-        }*/
+        }
 
-        writeProcessedRow(&row);
+        if (row.deleted == false) {
+            writeProcessedRow(&row);
+        }
     }
 
+    // New content
+    applyAppendRowFunctions(&args, delimiter, numberOfColumns);
+
     return EXIT_SUCCESS;
+}
+
+/**
+ * Loads a new row from standard input
+ * @param row Pointer to Row; it's required to set number and size fields
+ * @return Was it successful? If false, no other input is available.
+ */
+bool loadRow(Row *row) {
+    // Try to load new data for the new row; if unsuccessful return false
+    memset(row->data, '\0', row->size);
+    if (fgets(row->data, MAX_ROW_SIZE, stdin) == NULL) {
+        return false;
+    }
+
+    // Update structure with new data
+    row->size = (int)strlen(row->data);
+    row->number++;
+    row->deleted = false;
+
+    return true;
 }
 
 /**
@@ -142,9 +178,19 @@ int main(int argc, char **argv) {
  * @param row Processed row
  */
 void writeProcessedRow(const Row *row) {
-    for (int i = 0; i < row->size; i++) {
-        printf("%c", row->data[i]);
+    printf("%s", row->data);
+}
+
+/**
+ * Writes new row to standard output
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns of the new row
+ */
+void writeNewRow(char delimiter, int numberOfColumns) {
+    for (int i = 0; i < numberOfColumns - 1; i++) {
+        putchar(delimiter);
     }
+    putchar('\n');
 }
 
 /**
@@ -154,26 +200,6 @@ void writeProcessedRow(const Row *row) {
 void writeErrorMessage(const char *message) {
     fprintf(stderr, "sheet: %s", message);
 }
-
-/**
- * Processes provided row by other parameters
- * @param args Program's input arguments
- * @param row Input (raw) row
- * @param delimiters Column delimiter
- * @param numberOfColumns Number of column in each row
- * @return Error information
- */
-/*ErrorInfo processRowData(const InputArguments *args, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo = {false};
-
-    // Apply table editing functions
-    int newArgsSize = args->size - args->skipped;
-    for (int i = args->skipped; i < newArgsSize; i++) {
-        // TODO: apply functions from argument on the row
-    }
-
-    return errorInfo;
-}*/
 
 /**
  * Unifies delimiters in provided row - all will be replaced with the first one
@@ -219,6 +245,183 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
     }
 
     return errorInfo;
+}
+
+/**
+ * Applies table editing functions on provided row
+ * @param row Input (raw) row
+ * @param args Program's input arguments
+ * @param delimiters Column delimiter
+ * @param numberOfColumns Number of column in each row
+ * @return Error information
+ */
+ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+    char *functions[7] = {"irow", "drow", "drows", "icol", "acol", "dcol", "dcols"};
+    int funcArgs[7] = {1, 1, 2, 1, 0, 1, 2};
+
+    // Apply table editing functions
+    int numbers[2];
+    for (int i = args->skipped; i < args->size; i++) {
+        // Arow is valid but not applied here, TODO: make it better
+        if (streq(args->data[i], "arow")) {
+            continue;
+        }
+
+        // Prepare arguments for functions
+        int j;
+        char function[6]; // Selected function
+        for (j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
+            if (streq(args->data[i], functions[j])) {
+                strcpy(function, functions[j]);
+
+                for (int k = 0; k < funcArgs[j]; k++) {
+                    int index = i + k + 1; // Index of argument in InputArguments
+                    if (index >= args->size || (numbers[k] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
+                        errorInfo.error = true;
+                        errorInfo.message = "Chybne cislo radku/sloupce, povolena jsou cela cisla od 1.";
+
+                        return errorInfo;
+                    }
+                }
+
+                // Move iterator of arguments array by function arguments
+                i += funcArgs[j];
+                // Function was found, doesn't make sense to continue searching
+                break;
+            } else {
+                memset(function, '\0', sizeof(function));
+            }
+        }
+
+        // Column-operated functions are skipped if the row is set as deleted - it doesn't make sense to apply them
+        if (streq(function, "irow")) {
+            if (row->number == numbers[0]) {
+                writeNewRow(delimiter, *numberOfColumns);
+            }
+        } else if (streq(function, "drow")) {
+            if (row->number == numbers[0]) {
+                row->deleted = true;
+            }
+        } else if (streq(function, "drows")) {
+            if (numbers[0] > numbers[1]) {
+                errorInfo.error = true;
+                errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
+
+                return errorInfo;
+            }
+
+            if (row->number >= numbers[0] && row->number <= numbers[1]) {
+                row->deleted = true;
+            }
+        } else if (streq(function, "icol")) {
+            char columnValue[MAX_CELL_SIZE];
+            if ((errorInfo = getColumnValue(columnValue, row, numbers[0], delimiter, *numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+
+            char newColumnValue[MAX_CELL_SIZE];
+            newColumnValue[0] = delimiter;
+            strcat(newColumnValue, columnValue);
+
+            // Row should exists - last operation on it ended with success
+            setColumnValue(newColumnValue, row, numbers[0], delimiter, *numberOfColumns);
+
+            // Do it only once
+            if (row->number == 1) {
+                (*numberOfColumns)++;
+            }
+        } else if (row->deleted == false && streq(function, "acol")) {
+            if ((row->size + 1) < MAX_ROW_SIZE) {
+                row->data[row->size - 1] = delimiter;
+                row->data[row->size] = '\n';
+                row->size++;
+
+                // Do it only once
+                if (row->number == 1) {
+                    (*numberOfColumns)++;
+                }
+            } else {
+                errorInfo.error = true;
+                errorInfo.message = "Provedenim prikazu acol byla prekrocena maximalni velikost radku.";
+
+                return errorInfo;
+            }
+        } else if (row->deleted == false && (streq(function, "dcol") || streq(function, "dcols"))) {
+            if (streq(function, "dcol")) {
+                numbers[1] = numbers[0];
+            }
+
+            if (numbers[0] > numbers[1]) {
+                errorInfo.error = true;
+                errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
+
+                return errorInfo;
+            }
+
+            dcols(numbers[0], numbers[1], row, delimiter);
+        } else {
+            errorInfo.error = true;
+            errorInfo.message = "Neplatny nazev funkce.";
+
+            return errorInfo;
+        }
+    }
+
+    return errorInfo;
+}
+
+/**
+ * Applies append row functions to output
+ * @param args Program input arguments
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns
+ */
+void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns) {
+    for (int i = args->skipped; i < args->size; i++) {
+        if (streq(args->data[i], "arow")) {
+            writeNewRow(delimiter, numberOfColumns);
+        }
+    }
+}
+
+/**
+ * Deletes row's columns from selected range
+ * @param from First selected column number
+ * @param to Last selected column number
+ * @param row Operated row
+ * @param delimiter Column delimiter
+ */
+void dcols(int from, int to, Row *row, char delimiter) {
+    // Backup for future recovery + clean row
+    char rowBackup[MAX_ROW_SIZE];
+    memmove(rowBackup, row->data, MAX_ROW_SIZE);
+    memset(row->data, '\0', MAX_ROW_SIZE);
+
+    // Recovery only data of non-deleted columns
+    int counter = 1; // Actual number of column, column numbering starts from 1
+    int dataIndex = 0;
+    for (int j = 0; j < row->size; j++) {
+        if (!(counter >= from && counter <= to)) {
+            row->data[dataIndex] = rowBackup[j];
+            dataIndex++;
+        } else if (j == (row->size - 1)) {
+            // The last column is being removed, so end delimiter must be deleted
+            dataIndex--;
+            row->data[dataIndex] = '\0';
+        }
+
+        if(rowBackup[j] == delimiter) {
+            counter++;
+        }
+    }
+
+    // Recount row's size and ensure \n at the end of the row
+    row->size = (int)strlen(row->data);
+    if (row->data[row->size - 1] != '\n') {
+        row->data[row->size] = '\n';
+        row->size++;
+    }
 }
 
 /**
@@ -292,18 +495,107 @@ int countColumns(Row *row, char delimiter) {
 /**
  * Converts string to row/column number
  * @param value String with expected row/column number
- * @return Row/column number or ANY_NUMBER for '-' or INVALID_NUMBER for invalid value
+ * @param specialAllowed Is special state allowed? ('-' for last row)
+ * @return Row/column number or LAST_ROW_NUMBER for '-' or INVALID_NUMBER for invalid value
  */
-int convertToRowColumnNumber(char *value) {
-    // Special state - can be any row/column number
-    if (strcmp(value, "-") == 0) {
-        return ANY_NUMBER;
+int toRowColNum(char *value, bool specialAllowed) {
+    // Special state - the last row number
+    if (streq(value, "-") && specialAllowed == true) {
+        return LAST_ROW_NUMBER;
     }
 
     int result;
-    if ((result = strtol(value, NULL, 10)) != 0) {
+    if ((result = (int)strtol(value, NULL, 10)) >= 1) {
         return result;
     } else {
         return INVALID_NUMBER;
     }
+}
+
+/**
+ * Returns value of the selected column
+ * @param value Pointer for return value (value is without '\n')
+ * @param row Row contains the column
+ * @param columnNumber Number of selected column
+ * @param delimiter Column delimiter
+ * @return Error information
+ */
+ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if (columnNumber > numberOfColumns) {
+        errorInfo.error = true;
+        errorInfo.message = "Sloupec s pozadovanym cislem neexistuje.";
+    }
+
+    int counter = 1;
+    int j = 0;
+    memset(value, '\0', MAX_CELL_SIZE);
+    for (int i = 0; i < row->size; i++) {
+        // \n is "delimiter" for the last column
+        if (row->data[i] == delimiter || row->data[i] == '\n') {
+            counter++;
+        } else if (counter == columnNumber) {
+            value[j] = row->data[i];
+            j++;
+        }
+    }
+
+    return errorInfo;
+}
+
+ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if (columnNumber > numberOfColumns) {
+        errorInfo.error = true;
+        errorInfo.message = "Sloupec s pozadovanym cislem neexistuje.";
+    }
+
+    // Backup row data
+    char rowBackup[MAX_ROW_SIZE];
+    for (int i = 0; i < MAX_ROW_SIZE; i++) {
+        rowBackup[i] = row->data[i];
+    }
+
+    int counter = 1;
+    int backupIndex, dataIndex;
+    for (dataIndex = backupIndex = 0; backupIndex < MAX_ROW_SIZE;) {
+        if (counter == columnNumber) {
+            // Replace row data with new value's content
+            int i = 0;
+            while (value[i] != '\0') {
+                row->data[i + dataIndex] = value[i];
+                i++;
+            }
+            // Move index of row data to a new position (new value can has diff length)
+            dataIndex = backupIndex + i;
+
+            // Delimiter is after the end of normal column, \n is at the end of the last column
+            while (rowBackup[backupIndex] != delimiter && rowBackup[backupIndex] != '\n') {
+                backupIndex++;
+            }
+        }
+
+        // Loading unchanged data from backup
+        row->data[dataIndex] = rowBackup[backupIndex];
+
+        // Mark next column
+        if (rowBackup[backupIndex] == delimiter || rowBackup[backupIndex] == '\n') {
+            counter++;
+        }
+
+        dataIndex++;
+        backupIndex++;
+    }
+
+    // Function removes \n in the last column, so put it back
+    if (columnNumber == numberOfColumns) {
+        row->data[dataIndex] = '\n';
+    }
+
+    // Count new size after changes
+    row->size = (int)strlen(row->data);
+
+    return errorInfo;
 }
