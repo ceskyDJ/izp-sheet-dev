@@ -307,11 +307,6 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
             if ((errorInfo = dcols(function.params[0], function.params[1], row, delimiter)).error == true) {
                 return errorInfo;
             }
-        } else {
-            errorInfo.error = true;
-            errorInfo.message = "Neplatny nazev funkce.";
-
-            return errorInfo;
         }
     }
 
@@ -566,11 +561,15 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
             // Move iterator of arguments array by function arguments
             *position += funcArgs[j];
             // Function was found, doesn't make sense to continue searching
-            break;
+            return errorInfo;
         } else {
             memset(function->name, '\0', sizeof(function->name));
         }
     }
+
+    // Function not found --> function name must be bad
+    errorInfo.error = true;
+    errorInfo.message = "Neplatny nazev funkce.";
 
     return errorInfo;
 }
