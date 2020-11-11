@@ -87,7 +87,7 @@ void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfC
 ErrorInfo drows(int from, int to, Row *row);
 ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
-void dcols(int from, int to, Row *row, char delimiter);
+ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
@@ -324,14 +324,9 @@ ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char 
                 numbers[1] = numbers[0];
             }
 
-            if (numbers[0] > numbers[1]) {
-                errorInfo.error = true;
-                errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
-
+            if ((errorInfo = dcols(numbers[0], numbers[1], row, delimiter)).error == true) {
                 return errorInfo;
             }
-
-            dcols(numbers[0], numbers[1], row, delimiter);
         } else {
             errorInfo.error = true;
             errorInfo.message = "Neplatny nazev funkce.";
@@ -448,8 +443,18 @@ ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns) {
  * @param to Last selected column number
  * @param row Operated row
  * @param delimiter Column delimiter
+ * @return Error information
  */
-void dcols(int from, int to, Row *row, char delimiter) {
+ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
+    ErrorInfo errorInfo = {false};
+
+    if (from > to) {
+        errorInfo.error = true;
+        errorInfo.message = "Byl zadan chybny interval - prvni cislo musi byt mensi nez druhe.";
+
+        return errorInfo;
+    }
+
     // Backup for future recovery + clean row
     char rowBackup[MAX_ROW_SIZE];
     memmove(rowBackup, row->data, MAX_ROW_SIZE);
@@ -479,6 +484,8 @@ void dcols(int from, int to, Row *row, char delimiter) {
         row->data[row->size] = '\n';
         row->size++;
     }
+
+    return errorInfo;
 }
 
 /**
