@@ -829,7 +829,7 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
 
     int counter = 1;
     int backupIndex, dataIndex;
-    for (dataIndex = backupIndex = 0; backupIndex < MAX_ROW_SIZE;) {
+    for (dataIndex = backupIndex = 0; dataIndex < MAX_ROW_SIZE;) {
         if (counter == columnNumber) {
             // Replace row data with new value's content
             int i = 0;
