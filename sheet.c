@@ -33,6 +33,14 @@
  * @def INVALID_NUMBER Invalid number of row/column provided in input arguments
  */
 #define INVALID_NUMBER -1
+/**
+ * @def LOWER_CASE Flag for lower case style
+ */
+#define LOWER_CASE true
+/**
+ * @def UPPER_CASE Flag for upper case style
+ */
+#define UPPER_CASE false
 
 /**
  * @def streq(first, second) Check if first equals second
@@ -76,10 +84,12 @@ typedef struct inputArguments {
  * @typedef Program defined function
  * @field name Name of the function
  * @field params Parameters' values required by function
+ * @field strParams String parameters' values required by function
  */
 typedef struct function {
     char name[8];
     int params[4];
+    char strParams[4][MAX_CELL_SIZE];
 } Function;
 
 // Input/Output functions
@@ -91,12 +101,15 @@ void writeErrorMessage(const char *message);
 char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
+ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, char delimiter, int numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
 // Table editing functions
 ErrorInfo drows(int from, int to, Row *row);
 ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo dcols(int from, int to, Row *row, char delimiter);
+// Data processing functions
+ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
@@ -151,6 +164,12 @@ int main(int argc, char **argv) {
         }
 
         if ((err = applyTableEditingFunctions(&row, &args, delimiter, &numberOfColumns)).error == true) {
+            writeErrorMessage(err.message);
+
+            return EXIT_FAILURE;
+        }
+
+        if ((err = applyDataProcessingFunctions(&row, &args, delimiter, numberOfColumns)).error == true) {
             writeErrorMessage(err.message);
 
             return EXIT_FAILURE;
@@ -272,8 +291,8 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
 
+    Function function;
     for (int i = args->skipped; i < args->size; i++) {
-        Function function;
         if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
             return errorInfo;
         }
@@ -325,6 +344,118 @@ void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfC
             writeNewRow(delimiter, numberOfColumns);
         }
     }
+}
+
+/**
+ * Applies data processing functions on provided row
+ * @param row Input row
+ * @param args Input program arguments
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error information
+ */
+ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    Function function;
+    for (int i = args->skipped; i < args->size; i++) {
+        if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
+            return errorInfo;
+        }
+
+        if (streq(function.name, "cset")) {
+            if ((errorInfo = setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+        } else if (streq(function.name, "tolower")) {
+            if ((errorInfo = changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+        } else if (streq(function.name, "toupper")) {
+            if ((errorInfo = changeColumnCase(UPPER_CASE, function.params[0], row, delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+        } else if(streq(function.name, "round")) {
+            char value[MAX_CELL_SIZE];
+            if ((errorInfo = getColumnValue(value, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+
+            double number = strtod(value, NULL);
+            memset(value, '\0', strlen(value));
+            sprintf(value, "%.f", number);
+
+            // Should be OK (this column has already been used)
+            setColumnValue(value, row, function.params[0], delimiter, numberOfColumns);
+        } else if (streq(function.name, "int")) {
+            char value[MAX_CELL_SIZE];
+            if ((errorInfo = getColumnValue(value, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+
+            bool decimal = true; // Is decimal part still iterating?
+            for (int j = 0; j < (int) strlen(value); j++) {
+                if (value[j] == '.') {
+                    decimal = false;
+                }
+
+                if (decimal == false) {
+                    value[j] = '\0';
+                }
+            }
+            // Should be OK (this column has already been used)
+            setColumnValue(value, row, function.params[0], delimiter, numberOfColumns);
+        } else if (streq(function.name, "copy")) {
+            char value[MAX_CELL_SIZE];
+            if ((errorInfo = getColumnValue(value, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+
+            if ((errorInfo = setColumnValue(value, row, function.params[1], delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+        } else if (streq(function.name, "swap")) {
+            char firstValue[MAX_CELL_SIZE];
+            char secondValue[MAX_CELL_SIZE];
+            if ((errorInfo = getColumnValue(firstValue, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+            if ((errorInfo = getColumnValue(secondValue, row, function.params[1], delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+
+            // Column numbers should be OK, so errors aren't expected
+            setColumnValue(firstValue, row, function.params[1], delimiter, numberOfColumns);
+            setColumnValue(secondValue, row, function.params[0], delimiter, numberOfColumns);
+        } else if (streq(function.name, "move")) {
+            if (function.params[1] > function.params[0]) {
+                errorInfo.error = true;
+                errorInfo.message = "Funkce move vyzaduje prvni cislo v parametech vetsi nez druhe.";
+
+                return errorInfo;
+            }
+
+            char moving[2 * MAX_CELL_SIZE];
+            char second[MAX_CELL_SIZE];
+            if ((errorInfo = getColumnValue(moving, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+            if ((errorInfo = getColumnValue(second, row, function.params[1], delimiter, numberOfColumns)).error == true) {
+                return errorInfo;
+            }
+
+            // Delete column for move
+            // Should be OK -> from this column has been successfully extracted before
+            dcols(function.params[0], function.params[0], row, delimiter);
+
+            // Add the moving column before second selected column
+            moving[strlen(moving)] = delimiter;
+            strcat(moving, second);
+            setColumnValue(moving, row, function.params[1], delimiter, numberOfColumns);
+        }
+    }
+
+    return errorInfo;
 }
 
 /**
@@ -464,6 +595,44 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
 }
 
 /**
+ * Changes column's case of selected column
+ * @param newCase New case (LOWER_CASE or UPPER_CASE)
+ * @param column Selected column
+ * @param row Row contains the column
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+    char value[MAX_CELL_SIZE];
+
+    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    int move;
+    char start;
+    if (newCase == LOWER_CASE) {
+        start = 'A';
+        move = ('a' - 'A');
+    } else {
+        start = 'a';
+        move = -('a' - 'A');
+    }
+
+    for (int j = 0; j < (int)strlen(value); j++) {
+        if (value[j] >= start && value[j] <= start + ('z' - 'a')) {
+            value[j] = (char)(value[j] + move);
+        }
+    }
+    // It should be OK (it has been read from this column yet)
+    setColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    return errorInfo;
+}
+
+/**
  * Checks if the provided char is a delimiter
  * @param c Char for checking
  * @param delimiters Used delimiters
@@ -540,8 +709,11 @@ int countColumns(Row *row, char delimiter) {
  */
 ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, int *position) {
     ErrorInfo errorInfo = {false};
-    char *functions[8] = {"arow", "irow", "drow", "drows", "icol", "acol", "dcol", "dcols"};
-    int funcArgs[8] = {0, 1, 1, 2, 1, 0, 1, 2};
+    char *functions[16] = {
+            "arow", "irow", "drow", "drows", "icol", "acol", "dcol", "dcols", "cset", "tolower", "toupper", "round",
+            "int", "copy", "swap", "move"
+    };
+    int funcArgs[16] = {0, 1, 1, 2, 1, 0, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2};
 
     // Prepare arguments for functions
     for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
@@ -551,10 +723,16 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
             for (int i = 0; i < funcArgs[j]; i++) {
                 int index = *position + i + 1; // Index of argument in InputArguments
                 if (index >= args->size || (function->params[i] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
-                    errorInfo.error = true;
-                    errorInfo.message = "Chybne cislo radku/sloupce, povolena jsou cela cisla od 1.";
+                    // There is an exception... (function that accepts string value as one of its params)
+                    if (!(streq(function->name, "cset") && i == 1)) {
+                        errorInfo.error = true;
+                        errorInfo.message = "Chybne cislo radku/sloupce, povolena jsou cela cisla od 1.";
 
-                    return errorInfo;
+                        return errorInfo;
+                    } else {
+                        memset(function->strParams[i], '\0', sizeof(function->strParams[i]));
+                        memmove(function->strParams[i], args->data[index], strlen(args->data[index]));
+                    }
                 }
             }
 
