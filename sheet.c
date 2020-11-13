@@ -113,6 +113,7 @@ ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, i
 ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
@@ -392,18 +393,9 @@ ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, cha
                 return errorInfo;
             }
         } else if (streq(function.name, "swap")) {
-            char firstValue[MAX_CELL_SIZE];
-            char secondValue[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(firstValue, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+            if ((errorInfo = swap(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-            if ((errorInfo = getColumnValue(secondValue, row, function.params[1], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-
-            // Column numbers should be OK, so errors aren't expected
-            setColumnValue(firstValue, row, function.params[1], delimiter, numberOfColumns);
-            setColumnValue(secondValue, row, function.params[0], delimiter, numberOfColumns);
         } else if (streq(function.name, "move")) {
             if ((errorInfo = move(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
@@ -666,6 +658,34 @@ ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns) 
     if ((errorInfo = setColumnValue(value, row, to, delimiter, numberOfColumns)).error == true) {
         return errorInfo;
     }
+
+    return errorInfo;
+}
+
+/**
+ * Swaps values of selected columns
+ * @param first First selected column
+ * @param second Second selected column
+ * @param row Row contains columns
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    char firstValue[MAX_CELL_SIZE];
+    char secondValue[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(firstValue, row, first, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+    if ((errorInfo = getColumnValue(secondValue, row, second, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    // Column numbers should be OK, so errors aren't expected
+    setColumnValue(firstValue, row, second, delimiter, numberOfColumns);
+    setColumnValue(secondValue, row, first, delimiter, numberOfColumns);
 
     return errorInfo;
 }
