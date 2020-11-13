@@ -34,6 +34,10 @@
  */
 #define INVALID_NUMBER -1
 /**
+ * @def NO_SELECTION No selection function set
+ */
+#define NO_SELECTION 0
+/**
  * @def LOWER_CASE Flag for lower case style
  */
 #define LOWER_CASE true
@@ -85,11 +89,15 @@ typedef struct inputArguments {
  * @field name Name of the function
  * @field params Parameters' values required by function
  * @field strParams String parameters' values required by function
+ * @field from The first selected row (NO_SELECTION if selection not active)
+ * @field to The last selected row (LAST_ROW_NUMBER if the end of file)
  */
 typedef struct function {
     char name[8];
     int params[4];
     char strParams[4][MAX_CELL_SIZE];
+    int from;
+    int to;
 } Function;
 
 // Input/Output functions
@@ -366,6 +374,21 @@ ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, cha
     for (int i = args->skipped; i < args->size; i++) {
         if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
             return errorInfo;
+        }
+
+        // Row selection
+        if (function.from != NO_SELECTION && function.to != LAST_ROW_NUMBER) {
+            // Normal selection
+            if (!(row->number >= function.from && row->number <= function.to)) {
+                // Do not modify this row with this function
+                continue;
+            }
+        } else if (function.from != NO_SELECTION && function.to == LAST_ROW_NUMBER) {
+            // Selection from N to end of file
+            if (row->number < function.from) {
+                // Do not modify this row with this function
+                continue;
+            }
         }
 
         if (streq(function.name, "cset")) {
@@ -813,11 +836,16 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
     };
     int funcArgs[16] = {0, 1, 1, 2, 1, 0, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2};
 
-    // Prepare arguments for functions
+    // Reset function's parameters to defaults
+    function->from = NO_SELECTION;
+    function->to = LAST_ROW_NUMBER;
+
+    // Find function
     for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
         if (streq(args->data[*position], functions[j])) {
             strcpy(function->name, functions[j]);
 
+            // Prepare arguments for the function
             for (int i = 0; i < funcArgs[j]; i++) {
                 int index = *position + i + 1; // Index of argument in InputArguments
                 if (index >= args->size || (function->params[i] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
@@ -838,6 +866,24 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
             *position += funcArgs[j];
             // Function was found, doesn't make sense to continue searching
             return errorInfo;
+        } else if (streq(args->data[*position], "rows")) {
+            // Rows selection
+            if ((function->from = toRowColNum(args->data[++(*position)], false)) == INVALID_NUMBER) {
+                errorInfo.error = true;
+                errorInfo.message = "Chybne cislo ve vyberu pocatecniho radku, povolena jsou cela cisla od 1.";
+
+                return errorInfo;
+            }
+
+            if ((function->to = toRowColNum(args->data[++(*position)], true)) == INVALID_NUMBER) {
+                errorInfo.error = true;
+                errorInfo.message = "Chybne cislo ve vyberu koncoveho radku, povolena jsou cela cisla od 1 a '-'.";
+
+                return errorInfo;
+            }
+
+            // Move position to next function
+            (*position)++;
         } else {
             memset(function->name, '\0', sizeof(function->name));
         }
