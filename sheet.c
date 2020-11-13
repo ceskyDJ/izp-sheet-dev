@@ -559,19 +559,19 @@ ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, i
         return errorInfo;
     }
 
-    int move;
+    int shift;
     char start;
     if (newCase == LOWER_CASE) {
         start = 'A';
-        move = ('a' - 'A');
+        shift = ('a' - 'A');
     } else {
         start = 'a';
-        move = -('a' - 'A');
+        shift = -('a' - 'A');
     }
 
     for (int j = 0; j < (int)strlen(value); j++) {
         if (value[j] >= start && value[j] <= start + ('z' - 'a')) {
-            value[j] = (char)(value[j] + move);
+            value[j] = (char)(value[j] + shift);
         }
     }
     // It should be OK (it has been read from this column yet)
