@@ -111,6 +111,7 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 // Data processing functions
 ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
@@ -382,23 +383,9 @@ ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, cha
                 return errorInfo;
             }
         } else if (streq(function.name, "int")) {
-            char value[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(value, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+            if ((errorInfo = removeColumnDecimalPart(function.params[0], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-
-            bool decimal = true; // Is decimal part still iterating?
-            for (int j = 0; j < (int) strlen(value); j++) {
-                if (value[j] == '.') {
-                    decimal = false;
-                }
-
-                if (decimal == false) {
-                    value[j] = '\0';
-                }
-            }
-            // Should be OK (this column has already been used)
-            setColumnValue(value, row, function.params[0], delimiter, numberOfColumns);
         } else if (streq(function.name, "copy")) {
             char value[MAX_CELL_SIZE];
             if ((errorInfo = getColumnValue(value, row, function.params[0], delimiter, numberOfColumns)).error == true) {
@@ -625,6 +612,38 @@ ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfCol
     memset(value, '\0', strlen(value));
     sprintf(value, "%.f", number);
 
+    // Should be OK (this column has already been used)
+    setColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    return errorInfo;
+}
+
+/**
+ * Removes decimal part from selected column's value (only removes, without rounding)
+ * @param column Selected column
+ * @param row Row contains the column
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    char value[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    bool decimal = true; // Is decimal part still iterating?
+    for (int j = 0; j < (int) strlen(value); j++) {
+        if (value[j] == '.') {
+            decimal = false;
+        }
+
+        if (decimal == false) {
+            value[j] = '\0';
+        }
+    }
     // Should be OK (this column has already been used)
     setColumnValue(value, row, column, delimiter, numberOfColumns);
 
