@@ -112,6 +112,7 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
@@ -387,12 +388,7 @@ ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, cha
                 return errorInfo;
             }
         } else if (streq(function.name, "copy")) {
-            char value[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(value, row, function.params[0], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-
-            if ((errorInfo = setColumnValue(value, row, function.params[1], delimiter, numberOfColumns)).error == true) {
+            if ((errorInfo = copy(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
         } else if (streq(function.name, "swap")) {
@@ -646,6 +642,30 @@ ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numb
     }
     // Should be OK (this column has already been used)
     setColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    return errorInfo;
+}
+
+/**
+ * Copies column's value to another column
+ * @param from Source column
+ * @param to Target column
+ * @param row Row contains columns
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    char value[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(value, row, from, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    if ((errorInfo = setColumnValue(value, row, to, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
 
     return errorInfo;
 }
