@@ -110,6 +110,7 @@ ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 // Data processing functions
 ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
@@ -428,30 +429,9 @@ ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, cha
             setColumnValue(firstValue, row, function.params[1], delimiter, numberOfColumns);
             setColumnValue(secondValue, row, function.params[0], delimiter, numberOfColumns);
         } else if (streq(function.name, "move")) {
-            if (function.params[1] > function.params[0]) {
-                errorInfo.error = true;
-                errorInfo.message = "Funkce move vyzaduje prvni cislo v parametech vetsi nez druhe.";
-
+            if ((errorInfo = move(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-
-            char moving[2 * MAX_CELL_SIZE];
-            char second[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(moving, row, function.params[0], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-            if ((errorInfo = getColumnValue(second, row, function.params[1], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-
-            // Delete column for move
-            // Should be OK -> from this column has been successfully extracted before
-            dcols(function.params[0], function.params[0], row, delimiter);
-
-            // Add the moving column before second selected column
-            moving[strlen(moving)] = delimiter;
-            strcat(moving, second);
-            setColumnValue(moving, row, function.params[1], delimiter, numberOfColumns);
         }
     }
 
@@ -628,6 +608,46 @@ ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, i
     }
     // It should be OK (it has been read from this column yet)
     setColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    return errorInfo;
+}
+
+/**
+ * Moves selected column before another selected column
+ * @param column Selected column to move
+ * @param beforeColumn Selected column to move the first before
+ * @param row Row contains the column
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error information
+ */
+ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    if (beforeColumn > column) {
+        errorInfo.error = true;
+        errorInfo.message = "Funkce move vyzaduje prvni cislo v parametech vetsi nez druhe.";
+
+        return errorInfo;
+    }
+
+    char moving[2 * MAX_CELL_SIZE];
+    char second[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(moving, row, column, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+    if ((errorInfo = getColumnValue(second, row, beforeColumn, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    // Delete column for move
+    // Should be OK -> from this column has been successfully extracted before
+    dcols(column, column, row, delimiter);
+
+    // Add the moving column before second selected column
+    moving[strlen(moving)] = delimiter;
+    strcat(moving, second);
+    setColumnValue(moving, row, beforeColumn, delimiter, numberOfColumns);
 
     return errorInfo;
 }
