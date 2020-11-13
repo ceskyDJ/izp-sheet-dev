@@ -110,6 +110,11 @@ ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 // Data processing functions
 ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
@@ -376,82 +381,25 @@ ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, cha
                 return errorInfo;
             }
         } else if(streq(function.name, "round")) {
-            char value[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(value, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+            if ((errorInfo = roundColumnValue(function.params[0], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-
-            double number = strtod(value, NULL);
-            memset(value, '\0', strlen(value));
-            sprintf(value, "%.f", number);
-
-            // Should be OK (this column has already been used)
-            setColumnValue(value, row, function.params[0], delimiter, numberOfColumns);
         } else if (streq(function.name, "int")) {
-            char value[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(value, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+            if ((errorInfo = removeColumnDecimalPart(function.params[0], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-
-            bool decimal = true; // Is decimal part still iterating?
-            for (int j = 0; j < (int) strlen(value); j++) {
-                if (value[j] == '.') {
-                    decimal = false;
-                }
-
-                if (decimal == false) {
-                    value[j] = '\0';
-                }
-            }
-            // Should be OK (this column has already been used)
-            setColumnValue(value, row, function.params[0], delimiter, numberOfColumns);
         } else if (streq(function.name, "copy")) {
-            char value[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(value, row, function.params[0], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-
-            if ((errorInfo = setColumnValue(value, row, function.params[1], delimiter, numberOfColumns)).error == true) {
+            if ((errorInfo = copy(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
         } else if (streq(function.name, "swap")) {
-            char firstValue[MAX_CELL_SIZE];
-            char secondValue[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(firstValue, row, function.params[0], delimiter, numberOfColumns)).error == true) {
+            if ((errorInfo = swap(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-            if ((errorInfo = getColumnValue(secondValue, row, function.params[1], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-
-            // Column numbers should be OK, so errors aren't expected
-            setColumnValue(firstValue, row, function.params[1], delimiter, numberOfColumns);
-            setColumnValue(secondValue, row, function.params[0], delimiter, numberOfColumns);
         } else if (streq(function.name, "move")) {
-            if (function.params[1] > function.params[0]) {
-                errorInfo.error = true;
-                errorInfo.message = "Funkce move vyzaduje prvni cislo v parametech vetsi nez druhe.";
-
+            if ((errorInfo = move(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
                 return errorInfo;
             }
-
-            char moving[2 * MAX_CELL_SIZE];
-            char second[MAX_CELL_SIZE];
-            if ((errorInfo = getColumnValue(moving, row, function.params[0], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-            if ((errorInfo = getColumnValue(second, row, function.params[1], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-
-            // Delete column for move
-            // Should be OK -> from this column has been successfully extracted before
-            dcols(function.params[0], function.params[0], row, delimiter);
-
-            // Add the moving column before second selected column
-            moving[strlen(moving)] = delimiter;
-            strcat(moving, second);
-            setColumnValue(moving, row, function.params[1], delimiter, numberOfColumns);
         }
     }
 
@@ -628,6 +576,156 @@ ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, i
     }
     // It should be OK (it has been read from this column yet)
     setColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    return errorInfo;
+}
+
+/**
+ * Rounds value in selected column
+ * @param column Selected column
+ * @param row Row contains the column
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error information
+ */
+ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    char value[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    double number = strtod(value, NULL);
+    memset(value, '\0', strlen(value));
+    sprintf(value, "%.f", number);
+
+    // Should be OK (this column has already been used)
+    setColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    return errorInfo;
+}
+
+/**
+ * Removes decimal part from selected column's value (only removes, without rounding)
+ * @param column Selected column
+ * @param row Row contains the column
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    char value[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    bool decimal = true; // Is decimal part still iterating?
+    for (int j = 0; j < (int) strlen(value); j++) {
+        if (value[j] == '.') {
+            decimal = false;
+        }
+
+        if (decimal == false) {
+            value[j] = '\0';
+        }
+    }
+    // Should be OK (this column has already been used)
+    setColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    return errorInfo;
+}
+
+/**
+ * Copies column's value to another column
+ * @param from Source column
+ * @param to Target column
+ * @param row Row contains columns
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    char value[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(value, row, from, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    if ((errorInfo = setColumnValue(value, row, to, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    return errorInfo;
+}
+
+/**
+ * Swaps values of selected columns
+ * @param first First selected column
+ * @param second Second selected column
+ * @param row Row contains columns
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    char firstValue[MAX_CELL_SIZE];
+    char secondValue[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(firstValue, row, first, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+    if ((errorInfo = getColumnValue(secondValue, row, second, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    // Column numbers should be OK, so errors aren't expected
+    setColumnValue(firstValue, row, second, delimiter, numberOfColumns);
+    setColumnValue(secondValue, row, first, delimiter, numberOfColumns);
+
+    return errorInfo;
+}
+
+/**
+ * Moves selected column before another selected column
+ * @param column Selected column to move
+ * @param beforeColumn Selected column to move the first before
+ * @param row Row contains the column
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error information
+ */
+ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo;
+
+    if (beforeColumn > column) {
+        errorInfo.error = true;
+        errorInfo.message = "Funkce move vyzaduje prvni cislo v parametech vetsi nez druhe.";
+
+        return errorInfo;
+    }
+
+    char moving[2 * MAX_CELL_SIZE];
+    char second[MAX_CELL_SIZE];
+    if ((errorInfo = getColumnValue(moving, row, column, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+    if ((errorInfo = getColumnValue(second, row, beforeColumn, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    // Delete column for move
+    // Should be OK -> from this column has been successfully extracted before
+    dcols(column, column, row, delimiter);
+
+    // Add the moving column before second selected column
+    moving[strlen(moving)] = delimiter;
+    strcat(moving, second);
+    setColumnValue(moving, row, beforeColumn, delimiter, numberOfColumns);
 
     return errorInfo;
 }
@@ -829,7 +927,7 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
 
     int counter = 1;
     int backupIndex, dataIndex;
-    for (dataIndex = backupIndex = 0; backupIndex < MAX_ROW_SIZE;) {
+    for (dataIndex = backupIndex = 0; dataIndex < MAX_ROW_SIZE;) {
         if (counter == columnNumber) {
             // Replace row data with new value's content
             int i = 0;
