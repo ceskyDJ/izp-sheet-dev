@@ -186,12 +186,16 @@ int main(int argc, char **argv) {
         }
 
         int i = 0;
+        bool tableChanged = false;
+        bool dataChanged = false;
         while (functions[i].name[0] != '\0') {
             // Table editing functions
             if ((err = applyTableEditingFunction(&row, functions[i], delimiter, &numberOfColumns)).error == true) {
                 writeErrorMessage(err.message);
 
                 return EXIT_FAILURE;
+            } else if (err.message == NULL) {
+                tableChanged = true;
             }
 
             // Row selection (don't modify some rows with actual function)
@@ -214,9 +218,17 @@ int main(int argc, char **argv) {
                 writeErrorMessage(err.message);
 
                 return EXIT_FAILURE;
+            } else if (err.message == NULL) {
+                dataChanged = true;
             }
 
             i++;
+        }
+
+        if (tableChanged && dataChanged) {
+            writeErrorMessage("Je mozne pouzit bud pouze funkce pro zmenu tabulky nebo pouze pro zpracovani dat.");
+
+            return EXIT_FAILURE;
         }
 
         // Write output
@@ -384,6 +396,7 @@ ErrorInfo applyTableEditingFunction(Row *row, Function function, char delimiter,
         return dcols(function.params[0], function.params[1], row, delimiter);
     }
 
+    errorInfo.message = "NO_FUNCTION_USED";
     return errorInfo;
 }
 
@@ -430,6 +443,7 @@ ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimite
         return move(function.params[0], function.params[1], row, delimiter, numberOfColumns);
     }
 
+    errorInfo.message = "NO_FUNCTION_USED";
     return errorInfo;
 }
 
