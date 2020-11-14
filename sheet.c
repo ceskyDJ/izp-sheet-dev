@@ -22,6 +22,10 @@
  */
 #define MAX_CELL_SIZE 100
 /**
+ * @def MAX_FUNCTIONS Maximum functions in program input arguments
+ */
+#define MAX_FUNCTIONS 100
+/**
  * @def DEFAULT_DELIMITER Default delimiter for case user didn't set different
  */
 #define DEFAULT_DELIMITER " "
@@ -33,6 +37,10 @@
  * @def INVALID_NUMBER Invalid number of row/column provided in input arguments
  */
 #define INVALID_NUMBER -1
+/**
+ * @def NO_SELECTION No selection function set
+ */
+#define NO_SELECTION 0
 /**
  * @def LOWER_CASE Flag for lower case style
  */
@@ -85,11 +93,15 @@ typedef struct inputArguments {
  * @field name Name of the function
  * @field params Parameters' values required by function
  * @field strParams String parameters' values required by function
+ * @field from The first selected row (NO_SELECTION if selection not active)
+ * @field to The last selected row (LAST_ROW_NUMBER if the end of file)
  */
 typedef struct function {
     char name[8];
     int params[4];
     char strParams[4][MAX_CELL_SIZE];
+    int from;
+    int to;
 } Function;
 
 // Input/Output functions
@@ -100,8 +112,9 @@ void writeErrorMessage(const char *message);
 // Main control and processing
 char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
-ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
-ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, char delimiter, int numberOfColumns);
+ErrorInfo parseInputArguments(Function *functions, const InputArguments *args);
+ErrorInfo applyTableEditingFunction(Row *row, Function function, char delimiter, int *numberOfColumns);
+ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimiter, int numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
 // Table editing functions
 ErrorInfo drows(int from, int to, Row *row);
@@ -163,23 +176,74 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
 
+        // Arguments processing
+        Function functions[MAX_FUNCTIONS];
+        if ((err = parseInputArguments(functions, &args)).error == true) {
+            writeErrorMessage(err.message);
+
+            return EXIT_FAILURE;
+        }
+
         // Data processing
         if(row.number == 1) {
             numberOfColumns = countColumns(&row, delimiter);
         }
 
-        if ((err = applyTableEditingFunctions(&row, &args, delimiter, &numberOfColumns)).error == true) {
-            writeErrorMessage(err.message);
+        int i = 0;
+        bool tableChanged = false;
+        bool dataChanged = false;
+        while (functions[i].name[0] != '\0') {
+            // Table editing functions
+            if ((err = applyTableEditingFunction(&row, functions[i], delimiter, &numberOfColumns)).error == true) {
+                writeErrorMessage(err.message);
+
+                return EXIT_FAILURE;
+            } else if (err.message == NULL) {
+                tableChanged = true;
+                i++;
+                continue;
+            }
+
+            if (dataChanged == true) {
+                writeErrorMessage("Je mozne pouzit pouze jednu funkci pro zpracovani dat.");
+
+                return EXIT_FAILURE;
+            }
+
+            // Row selection (don't modify some rows with actual function)
+            if (functions[i].from != NO_SELECTION && functions[i].to != LAST_ROW_NUMBER) {
+                // Normal selection
+                if (!(row.number >= functions[i].from && row.number <= functions[i].to)) {
+                    i++;
+                    continue;
+                }
+            } else if (functions[i].from != NO_SELECTION && functions[i].to == LAST_ROW_NUMBER) {
+                // Selection from N to end of file
+                if (row.number < functions[i].from) {
+                    i++;
+                    continue;
+                }
+            }
+
+            // Data processing functions
+            if ((err = applyDataProcessingFunction(&row, functions[i], delimiter, numberOfColumns)).error == true) {
+                writeErrorMessage(err.message);
+
+                return EXIT_FAILURE;
+            } else if (err.message == NULL) {
+                dataChanged = true;
+            }
+
+            i++;
+        }
+
+        if (tableChanged && dataChanged) {
+            writeErrorMessage("Je mozne pouzit bud pouze funkce pro zmenu tabulky nebo pouze pro zpracovani dat.");
 
             return EXIT_FAILURE;
         }
 
-        if ((err = applyDataProcessingFunctions(&row, &args, delimiter, numberOfColumns)).error == true) {
-            writeErrorMessage(err.message);
-
-            return EXIT_FAILURE;
-        }
-
+        // Write output
         if (row.deleted == false) {
             writeProcessedRow(&row);
         }
@@ -286,54 +350,65 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
 }
 
 /**
- * Applies table editing functions on provided row
- * @param row Input (raw) row
- * @param args Program's input arguments
- * @param delimiters Column delimiter
- * @param numberOfColumns Number of column in each row
+ * Parses arguments into functions (instances of Function data type)
+ * @param functions Pointer to array fro saving parsed output
+ * @param args Program input arguments
  * @return Error information
  */
-ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
+ErrorInfo parseInputArguments(Function *functions, const InputArguments *args) {
     ErrorInfo errorInfo = {false};
 
-    Function function;
+    int funcIndex = 0;
     for (int i = args->skipped; i < args->size; i++) {
+        Function function;
         if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
             return errorInfo;
         }
 
-        // Column-operated functions are skipped if the row is set as deleted - it doesn't make sense to apply them
-        if (streq(function.name, "irow")) {
-            if (row->number == function.params[0]) {
-                writeNewRow(delimiter, *numberOfColumns);
-            }
-        } else if (streq(function.name, "drow") || streq(function.name, "drows")) {
-            if (streq(function.name, "drow")) {
-                function.params[1] = function.params[0];
-            }
-
-            if ((errorInfo = drows(function.params[0], function.params[1], row)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "icol")) {
-            if ((errorInfo = icol(function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (row->deleted == false && streq(function.name, "acol")) {
-            if ((errorInfo = acol(row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (row->deleted == false && (streq(function.name, "dcol") || streq(function.name, "dcols"))) {
-            if (streq(function.name, "dcol")) {
-                function.params[1] = function.params[0];
-            }
-
-            if ((errorInfo = dcols(function.params[0], function.params[1], row, delimiter)).error == true) {
-                return errorInfo;
-            }
-        }
+        functions[funcIndex] = function;
+        funcIndex++;
     }
 
+    return errorInfo;
+}
+
+/**
+ * Applies table editing function on provided row
+ * @param row Input (raw) row
+ * @param function Function to use
+ * @param delimiters Column delimiter
+ * @param numberOfColumns Number of column in each row
+ * @return Error information
+ */
+ErrorInfo applyTableEditingFunction(Row *row, Function function, char delimiter, int *numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    // Column-operated functions are skipped if the row is set as deleted - it doesn't make sense to apply them
+    if (streq(function.name, "irow")) {
+        if (row->number == function.params[0]) {
+            writeNewRow(delimiter, *numberOfColumns);
+        }
+
+        return errorInfo;
+    } else if (streq(function.name, "drow") || streq(function.name, "drows")) {
+        if (streq(function.name, "drow")) {
+            function.params[1] = function.params[0];
+        }
+
+        return drows(function.params[0], function.params[1], row);
+    } else if (streq(function.name, "icol")) {
+        return icol(function.params[0], row, delimiter, numberOfColumns);
+    } else if (row->deleted == false && streq(function.name, "acol")) {
+        return acol(row, delimiter, numberOfColumns);
+    } else if (row->deleted == false && (streq(function.name, "dcol") || streq(function.name, "dcols"))) {
+        if (streq(function.name, "dcol")) {
+            function.params[1] = function.params[0];
+        }
+
+        return dcols(function.params[0], function.params[1], row, delimiter);
+    }
+
+    errorInfo.message = "NO_FUNCTION_USED";
     return errorInfo;
 }
 
@@ -352,57 +427,35 @@ void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfC
 }
 
 /**
- * Applies data processing functions on provided row
+ * Applies data processing function on provided row
  * @param row Input row
- * @param args Input program arguments
+ * @param function Function to use
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of column in the row
  * @return Error information
  */
-ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, char delimiter, int numberOfColumns) {
+ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimiter, int numberOfColumns) {
     ErrorInfo errorInfo = {false};
 
-    Function function;
-    for (int i = args->skipped; i < args->size; i++) {
-        if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
-            return errorInfo;
-        }
-
-        if (streq(function.name, "cset")) {
-            if ((errorInfo = setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "tolower")) {
-            if ((errorInfo = changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "toupper")) {
-            if ((errorInfo = changeColumnCase(UPPER_CASE, function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if(streq(function.name, "round")) {
-            if ((errorInfo = roundColumnValue(function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "int")) {
-            if ((errorInfo = removeColumnDecimalPart(function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "copy")) {
-            if ((errorInfo = copy(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "swap")) {
-            if ((errorInfo = swap(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "move")) {
-            if ((errorInfo = move(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        }
+    if (streq(function.name, "cset")) {
+        return setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns);
+    } else if (streq(function.name, "tolower")) {
+        return changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "toupper")) {
+        return changeColumnCase(UPPER_CASE, function.params[0], row, delimiter, numberOfColumns);
+    } else if(streq(function.name, "round")) {
+        return roundColumnValue(function.params[0], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "int")) {
+        return removeColumnDecimalPart(function.params[0], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "copy")) {
+        return copy(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "swap")) {
+        return swap(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "move")) {
+        return move(function.params[0], function.params[1], row, delimiter, numberOfColumns);
     }
 
+    errorInfo.message = "NO_FUNCTION_USED";
     return errorInfo;
 }
 
@@ -813,11 +866,16 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
     };
     int funcArgs[16] = {0, 1, 1, 2, 1, 0, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2};
 
-    // Prepare arguments for functions
+    // Reset function's parameters to defaults
+    function->from = NO_SELECTION;
+    function->to = LAST_ROW_NUMBER;
+
+    // Find function
     for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
         if (streq(args->data[*position], functions[j])) {
             strcpy(function->name, functions[j]);
 
+            // Prepare arguments for the function
             for (int i = 0; i < funcArgs[j]; i++) {
                 int index = *position + i + 1; // Index of argument in InputArguments
                 if (index >= args->size || (function->params[i] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
@@ -838,6 +896,24 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
             *position += funcArgs[j];
             // Function was found, doesn't make sense to continue searching
             return errorInfo;
+        } else if (streq(args->data[*position], "rows")) {
+            // Rows selection
+            if ((function->from = toRowColNum(args->data[++(*position)], false)) == INVALID_NUMBER) {
+                errorInfo.error = true;
+                errorInfo.message = "Chybne cislo ve vyberu pocatecniho radku, povolena jsou cela cisla od 1.";
+
+                return errorInfo;
+            }
+
+            if ((function->to = toRowColNum(args->data[++(*position)], true)) == INVALID_NUMBER) {
+                errorInfo.error = true;
+                errorInfo.message = "Chybne cislo ve vyberu koncoveho radku, povolena jsou cela cisla od 1 a '-'.";
+
+                return errorInfo;
+            }
+
+            // Move position to next function
+            (*position)++;
         } else {
             memset(function->name, '\0', sizeof(function->name));
         }
