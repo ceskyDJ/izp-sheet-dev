@@ -729,16 +729,9 @@ ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numb
         return errorInfo;
     }
 
-    bool decimal = true; // Is decimal part still iterating?
-    for (int j = 0; j < (int) strlen(value); j++) {
-        if (value[j] == '.') {
-            decimal = false;
-        }
-
-        if (decimal == false) {
-            value[j] = '\0';
-        }
-    }
+    double number = strtod(value, NULL);
+    memset(value, '\0', strlen(value));
+    sprintf(value, "%d", (int)number);
     // Should be OK (this column has already been used)
     setColumnValue(value, row, column, delimiter, numberOfColumns);
 
