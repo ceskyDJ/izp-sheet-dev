@@ -196,6 +196,14 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
             } else if (err.message == NULL) {
                 tableChanged = true;
+                i++;
+                continue;
+            }
+
+            if (dataChanged == true) {
+                writeErrorMessage("Je mozne pouzit pouze jednu funkci pro zpracovani dat.");
+
+                return EXIT_FAILURE;
             }
 
             // Row selection (don't modify some rows with actual function)
