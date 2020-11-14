@@ -1122,6 +1122,9 @@ ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, ch
                 return errorInfo;
             }
         }
+
+        *result = false;
+        return errorInfo;
     } else if (streq(selection->name, "beginswith")) {
         char value[MAX_CELL_SIZE];
         if ((errorInfo = getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns)).error == true) {
@@ -1133,6 +1136,9 @@ ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, ch
             *result = true;
             return errorInfo;
         }
+
+        *result = false;
+        return errorInfo;
     } else if (streq(selection->name, "contains")) {
         char value[MAX_CELL_SIZE];
         if ((errorInfo = getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns)).error == true) {
@@ -1143,8 +1149,12 @@ ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, ch
             *result = true;
             return errorInfo;
         }
+
+        *result = false;
+        return errorInfo;
     }
 
-    *result = false;
+    // No selection used --> row can be changed
+    *result = true;
     return errorInfo;
 }
