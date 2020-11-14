@@ -208,12 +208,21 @@ int main(int argc, char **argv) {
         bool tableChanged = false;
         bool dataChanged = false;
         while (functions[i].name[0] != '\0') {
+            SelectFunction selection = functions[i].selectFunction;
+
             // Table editing functions
             if ((err = applyTableEditingFunction(&row, functions[i], delimiter, &numberOfColumns)).error == true) {
                 writeErrorMessage(err.message);
 
                 return EXIT_FAILURE;
             } else if (err.message == NULL) {
+                // Selections on table editing functions are forbidden
+                if (selection.name[0] != '\0') {
+                    writeErrorMessage("Funkce pro vyber radku neni mozne pouzit na funkce menici strukturu tabulky.");
+
+                    return EXIT_FAILURE;
+                }
+
                 // Does not make sense to continue with processing if the row was marked as deleted
                 if (row.deleted == true) {
                     break;
@@ -231,7 +240,6 @@ int main(int argc, char **argv) {
             }
 
             // Row selection (don't modify some rows with actual function)
-            SelectFunction selection = functions[i].selectFunction;
             bool accepts;
             if ((err = acceptsSelection(&accepts, &row, &selection, delimiter, numberOfColumns)).error == true) {
                 writeErrorMessage(err.message);
