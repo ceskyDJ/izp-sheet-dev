@@ -31,3 +31,18 @@ cppcheck:
   script:
     - apk add cppcheck -q
     - cppcheck --error-exitcode=1 --enable=all --language=c --suppress=missingIncludeSystem --verbose sheet.c
+
+kamil:
+  stage: test
+  image:
+    name: php:7.4
+  script:
+    - apt-get update < /dev/null > /dev/null
+    - apt-get install -qq -y git python2 < /dev/null > /dev/null
+    - git clone https://gitlab.com/kam29/izp-testsuite.git kamil
+    - cp sheet kamil/sheet
+    - cd kamil
+    - python2 testsuite.py
+  artifacts:
+    paths:
+      - kamil/log
