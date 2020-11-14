@@ -947,7 +947,7 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
                 return errorInfo;
             }
 
-            if (selection.params[1] != LAST_ROW_NUMBER && selection.params[1] <= selection.params[0]) {
+            if (selection.params[1] != LAST_ROW_NUMBER && selection.params[1] < selection.params[0]) {
                 errorInfo.error = true;
                 errorInfo.message = "Chybne poradi argumentu funkce rows, prvni cislo musi byt mensi nebo rovno.";
 
