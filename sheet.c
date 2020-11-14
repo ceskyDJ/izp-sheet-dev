@@ -61,12 +61,14 @@
  * @field size Row size (number of contained chars)
  * @field number Row number (from 1)
  * @field deleted Is the row mark as deleted?
+ * @field last Is this row the last?
  */
 typedef struct row {
     char data[MAX_ROW_SIZE];
     int size;
     int number;
     bool deleted;
+    bool last;
 } Row;
 /**
  * @typedef Error information tells how some action ended
@@ -115,7 +117,7 @@ typedef struct function {
 } Function;
 
 // Input/Output functions
-bool loadRow(Row *row);
+bool loadRow(Row *row, char *preloadedData);
 void writeProcessedRow(const Row *row);
 void writeNewRow(char delimiter, int numberOfColumns);
 void writeErrorMessage(const char *message);
@@ -173,10 +175,11 @@ int main(int argc, char **argv) {
 
     /* ROW PARSING */
     ErrorInfo err;
-    Row row = {.size = 0, .number = 0};
+    Row row = {.size = 0, .number = 0, .last = false};
     char delimiter;
     int numberOfColumns;
-    while (loadRow(&row) == true) {
+    char preloadedData[MAX_ROW_SIZE];
+    while (loadRow(&row, preloadedData) == true) {
         // Delimiter processing
         delimiter = unifyRowDelimiters(&row, (const char **) delimiters);
 
@@ -269,19 +272,40 @@ int main(int argc, char **argv) {
 /**
  * Loads a new row from standard input
  * @param row Pointer to Row; it's required to set number and size fields
+ * @param preloadedData Data preloaded in previous loadRow() call
  * @return Was it successful? If false, no other input is available.
  */
-bool loadRow(Row *row) {
-    // Try to load new data for the new row; if unsuccessful return false
-    memset(row->data, '\0', row->size);
-    if (fgets(row->data, MAX_ROW_SIZE, stdin) == NULL) {
+bool loadRow(Row *row, char *preloadedData) {
+    // Previous row was the last one
+    if (row->last) {
         return false;
     }
+
+    // First loading
+    if (row->number == 0) {
+        memset(preloadedData, '\0', row->size);
+
+        // Try to load data for the first row; if unsuccessful return false
+        if (fgets(preloadedData, MAX_ROW_SIZE, stdin) == NULL) {
+            return false;
+        }
+    }
+
+    // Load data of the current row
+    memset(row->data, '\0', row->size);
+    memmove(row->data, preloadedData, strlen(preloadedData));
 
     // Update structure with new data
     row->size = (int)strlen(row->data);
     row->number++;
     row->deleted = false;
+
+    // Try to preload new data for next row; if unsuccessful set row as the last
+    if (fgets(preloadedData, MAX_ROW_SIZE, stdin) == NULL) {
+        row->last = true;
+    } else {
+        row->last = false;
+    }
 
     return true;
 }
