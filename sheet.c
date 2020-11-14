@@ -146,6 +146,7 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
 int toRowColNum(char *value, bool specialAllowed);
 ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
 ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
+ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, char delimiter, int numberOfColumns);
 
 /**
  * Main function
@@ -222,45 +223,17 @@ int main(int argc, char **argv) {
 
             // Row selection (don't modify some rows with actual function)
             SelectFunction selection = functions[i].selectFunction;
-            if (streq(selection.name, "rows")) {
-                if (selection.params[0] != NO_SELECTION && selection.params[1] != LAST_ROW_NUMBER) {
-                    // Normal selection
-                    if (!(row.number >= selection.params[0] && row.number <= selection.params[1])) {
-                        i++;
-                        continue;
-                    }
-                } else if (selection.params[0] != NO_SELECTION && selection.params[1] == LAST_ROW_NUMBER) {
-                    // Selection from N to end of file
-                    if (row.number < selection.params[0]) {
-                        i++;
-                        continue;
-                    }
-                }
-            } else if (streq(selection.name, "beginswith")) {
-                char value[MAX_CELL_SIZE];
-                if ((err = getColumnValue(value, &row, selection.params[0], delimiter, numberOfColumns)).error == true) {
-                    writeErrorMessage(err.message);
+            bool accepts;
+            if ((err = acceptsSelection(&accepts, &row, &selection, delimiter, numberOfColumns)).error == true) {
+                writeErrorMessage(err.message);
 
-                    return EXIT_FAILURE;
-                }
+                return EXIT_FAILURE;
+            }
 
-                char *found = strstr(value, selection.strParams[1]);
-                if (found == NULL || !(streq(found, value))) {
-                    i++;
-                    continue;
-                }
-            } else if (streq(selection.name, "contains")) {
-                char value[MAX_CELL_SIZE];
-                if ((err = getColumnValue(value, &row, selection.params[0], delimiter, numberOfColumns)).error == true) {
-                    writeErrorMessage(err.message);
-
-                    return EXIT_FAILURE;
-                }
-
-                if (strstr(value, selection.strParams[1]) == NULL) {
-                    i++;
-                    continue;
-                }
+            // Skip applying the function on this row
+            if (accepts == false) {
+                i++;
+                continue;
             }
 
             // Data processing functions
@@ -1120,5 +1093,58 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
     // Count new size after changes
     row->size = (int)strlen(row->data);
 
+    return errorInfo;
+}
+
+/**
+ * Checks if the row accepts the selection
+ * @param result Accepts this row provided selection?
+ * @param row Row for check
+ * @param selection Operated selection
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if (streq(selection->name, "rows")) {
+        if (selection->params[0] != NO_SELECTION && selection->params[1] != LAST_ROW_NUMBER) {
+            // Normal selection
+            if (row->number >= selection->params[0] && row->number <= selection->params[1]) {
+                *result = true;
+                return errorInfo;
+            }
+        } else if (selection->params[0] != NO_SELECTION && selection->params[1] == LAST_ROW_NUMBER) {
+            // Selection from N to end of file
+            if (row->number > selection->params[0]) {
+                *result = true;
+                return errorInfo;
+            }
+        }
+    } else if (streq(selection->name, "beginswith")) {
+        char value[MAX_CELL_SIZE];
+        if ((errorInfo = getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns)).error == true) {
+            return errorInfo;
+        }
+
+        char *found = strstr(value, selection->strParams[1]);
+        if (found != NULL && streq(found, value)) {
+            *result = true;
+            return errorInfo;
+        }
+    } else if (streq(selection->name, "contains")) {
+        char value[MAX_CELL_SIZE];
+        if ((errorInfo = getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns)).error == true) {
+            return errorInfo;
+        }
+
+        if (strstr(value, selection->strParams[1]) != NULL) {
+            *result = true;
+            return errorInfo;
+        }
+    }
+
+    *result = false;
     return errorInfo;
 }
