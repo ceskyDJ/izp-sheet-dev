@@ -485,6 +485,13 @@ ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimite
     ErrorInfo errorInfo = {false};
 
     if (streq(function.name, "cset")) {
+        if ((int)strlen(function.strParams[1]) > MAX_CELL_SIZE) {
+            errorInfo.error = true;
+            errorInfo.message = "Hodnota predana funkci cset prekracuje maximalni velikost bunky.";
+
+            return errorInfo;
+        }
+
         return setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns);
     } else if (streq(function.name, "tolower")) {
         return changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns);
