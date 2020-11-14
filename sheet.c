@@ -40,7 +40,7 @@
 /**
  * @def NO_SELECTION No selection function set
  */
-#define NO_SELECTION 0
+#define NO_SELECTION -1
 /**
  * @def LOWER_CASE Flag for lower case style
  */
@@ -933,7 +933,7 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
         } else if (streq(args->data[*position], "rows")) {
             // Select interval of rows
             SelectFunction selection = {.name = "rows"};
-            if ((selection.params[0] = toRowColNum(args->data[++(*position)], false)) == INVALID_NUMBER) {
+            if ((selection.params[0] = toRowColNum(args->data[++(*position)], true)) == INVALID_NUMBER) {
                 errorInfo.error = true;
                 errorInfo.message = "Chybne cislo ve vyberu pocatecniho radku, povolena jsou cela cisla od 1.";
 
@@ -1136,6 +1136,12 @@ ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, ch
         if (selection->params[0] != NO_SELECTION && selection->params[1] != LAST_ROW_NUMBER) {
             // Normal selection
             if (row->number >= selection->params[0] && row->number <= selection->params[1]) {
+                *result = true;
+                return errorInfo;
+            }
+        } else if (selection->params[0] == LAST_ROW_NUMBER && selection->params[1] == LAST_ROW_NUMBER) {
+            // Selection for the last file only
+            if (row->last == true) {
                 *result = true;
                 return errorInfo;
             }
