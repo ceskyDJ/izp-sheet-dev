@@ -213,6 +213,11 @@ int main(int argc, char **argv) {
 
                 return EXIT_FAILURE;
             } else if (err.message == NULL) {
+                // Does not make sense to continue with processing if the row was marked as deleted
+                if (row.deleted == true) {
+                    break;
+                }
+
                 tableChanged = true;
                 i++;
                 continue;
@@ -261,6 +266,13 @@ int main(int argc, char **argv) {
         if (row.deleted == false) {
             writeProcessedRow(&row);
         }
+    }
+
+    // Empty input
+    if (row.number == 0) {
+        writeErrorMessage("Prazdny vstup neni povolen.");
+
+        return EXIT_FAILURE;
     }
 
     // New content
