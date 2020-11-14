@@ -1234,7 +1234,7 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
 bool isValidNumber(char *number) {
     bool decimalPoint = false; // Was decimal point found?
     for (int i = 0; i < (int) strlen(number); i++) {
-        if (number[i] < '0' || number[i] > '9') {
+        if ((number[i] < '0' || number[i] > '9') && (i == 0 && number[i] != '-')) {
             if (number[i] == '.' && decimalPoint == false) {
                 decimalPoint = true;
             } else {
