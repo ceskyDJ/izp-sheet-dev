@@ -912,9 +912,9 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
                 return errorInfo;
             }
 
-            if (function->to < function->from) {
+            if (function->to != LAST_ROW_NUMBER && function->to <= function->from) {
                 errorInfo.error = true;
-                errorInfo.message = "Chybne poradi argumentu funkce rows, prvni cislo musi byt mensi.";
+                errorInfo.message = "Chybne poradi argumentu funkce rows, prvni cislo musi byt mensi nebo rovno.";
 
                 return errorInfo;
             }
