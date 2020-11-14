@@ -149,6 +149,7 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
 int toRowColNum(char *value, bool specialAllowed);
 ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
 ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
+bool isValidNumber(char *number);
 
 /**
  * Main function
@@ -772,6 +773,14 @@ ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfCol
         return errorInfo;
     }
 
+    // The cells must contains valid number
+    if (isValidNumber(value) == false) {
+        errorInfo.error = true;
+        errorInfo.message = "Funkci round nelze provest na bunce, ktera neobsahuje validni cislo.";
+
+        return errorInfo;
+    }
+
     double number = strtod(value, NULL);
     memset(value, '\0', strlen(value));
     sprintf(value, "%.g", number);
@@ -795,6 +804,14 @@ ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numb
 
     char value[MAX_CELL_SIZE];
     if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
+        return errorInfo;
+    }
+
+    // The cells must contains valid number
+    if (isValidNumber(value) == false) {
+        errorInfo.error = true;
+        errorInfo.message = "Funkci round nelze provest na bunce, ktera neobsahuje validni cislo.";
+
         return errorInfo;
     }
 
@@ -1199,4 +1216,24 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
     row->size = (int)strlen(row->data);
 
     return errorInfo;
+}
+
+/**
+ * Checks if the string contains valid number
+ * @param number String for testing
+ * @return Is valid number in the string?
+ */
+bool isValidNumber(char *number) {
+    bool decimalPoint = false; // Was decimal point found?
+    for (int i = 0; i < (int) strlen(number); i++) {
+        if (number[i] < '0' || number[i] > '9') {
+            if (number[i] == '.' && decimalPoint == false) {
+                decimalPoint = true;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
