@@ -791,7 +791,7 @@ ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfCol
 
     double number = strtod(value, NULL);
     memset(value, '\0', strlen(value));
-    sprintf(value, "%.g", number);
+    sprintf(value, "%.f", number);
 
     // Should be OK (this column has already been used)
     setColumnValue(value, row, column, delimiter, numberOfColumns);
