@@ -356,7 +356,7 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
  * @return Error information
  */
 ErrorInfo parseInputArguments(Function *functions, const InputArguments *args) {
-    ErrorInfo errorInfo;
+    ErrorInfo errorInfo = {false};
 
     int funcIndex = 0;
     for (int i = args->skipped; i < args->size; i++) {
