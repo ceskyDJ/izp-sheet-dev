@@ -22,6 +22,10 @@
  */
 #define MAX_CELL_SIZE 100
 /**
+ * @def MAX_FUNCTIONS Maximum functions in program input arguments
+ */
+#define MAX_FUNCTIONS 100
+/**
  * @def DEFAULT_DELIMITER Default delimiter for case user didn't set different
  */
 #define DEFAULT_DELIMITER " "
@@ -108,6 +112,7 @@ void writeErrorMessage(const char *message);
 // Main control and processing
 char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
+ErrorInfo parseInputArguments(Function *functions, const InputArguments *args);
 ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
 ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, char delimiter, int numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
@@ -170,6 +175,10 @@ int main(int argc, char **argv) {
 
             return EXIT_FAILURE;
         }
+
+        // Arguments processing
+        Function functions[MAX_FUNCTIONS];
+        parseInputArguments(functions, &args);
 
         // Data processing
         if(row.number == 1) {
@@ -288,6 +297,29 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
         errorInfo.message = "Byla prekrocena maximalni velikost bunky.";
 
         return errorInfo;
+    }
+
+    return errorInfo;
+}
+
+/**
+ * Parses arguments into functions (instances of Function data type)
+ * @param functions Pointer to array fro saving parsed output
+ * @param args Program input arguments
+ * @return Error information
+ */
+ErrorInfo parseInputArguments(Function *functions, const InputArguments *args) {
+    ErrorInfo errorInfo;
+
+    int funcIndex = 0;
+    for (int i = args->skipped; i < args->size; i++) {
+        Function function;
+        if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
+            return errorInfo;
+        }
+
+        functions[funcIndex] = function;
+        funcIndex++;
     }
 
     return errorInfo;
