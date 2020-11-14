@@ -213,6 +213,11 @@ int main(int argc, char **argv) {
 
                 return EXIT_FAILURE;
             } else if (err.message == NULL) {
+                // Does not make sense to continue with processing if the row was marked as deleted
+                if (row.deleted == true) {
+                    break;
+                }
+
                 tableChanged = true;
                 i++;
                 continue;
