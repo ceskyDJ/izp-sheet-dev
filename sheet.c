@@ -89,6 +89,17 @@ typedef struct inputArguments {
     int skipped;
 } InputArguments;
 /**
+ * @typedef Program defined function for row selection
+ * @field name Name of the function
+ * @field params Parameters' values required by function
+ * @field strParams String parameters' values required by function
+ */
+typedef struct selectFunction {
+    char name[11];
+    int params[2];
+    char strParams[2][MAX_CELL_SIZE];
+} SelectFunction;
+/**
  * @typedef Program defined function
  * @field name Name of the function
  * @field params Parameters' values required by function
@@ -100,8 +111,7 @@ typedef struct function {
     char name[8];
     int params[4];
     char strParams[4][MAX_CELL_SIZE];
-    int from;
-    int to;
+    SelectFunction selectFunction;
 } Function;
 
 // Input/Output functions
@@ -211,17 +221,20 @@ int main(int argc, char **argv) {
             }
 
             // Row selection (don't modify some rows with actual function)
-            if (functions[i].from != NO_SELECTION && functions[i].to != LAST_ROW_NUMBER) {
-                // Normal selection
-                if (!(row.number >= functions[i].from && row.number <= functions[i].to)) {
-                    i++;
-                    continue;
-                }
-            } else if (functions[i].from != NO_SELECTION && functions[i].to == LAST_ROW_NUMBER) {
-                // Selection from N to end of file
-                if (row.number < functions[i].from) {
-                    i++;
-                    continue;
+            SelectFunction selection = functions[i].selectFunction;
+            if (streq(selection.name, "rows")) {
+                if (selection.params[0] != NO_SELECTION && selection.params[1] != LAST_ROW_NUMBER) {
+                    // Normal selection
+                    if (!(row.number >= selection.params[0] && row.number <= selection.params[1])) {
+                        i++;
+                        continue;
+                    }
+                } else if (selection.params[0] != NO_SELECTION && selection.params[1] == LAST_ROW_NUMBER) {
+                    // Selection from N to end of file
+                    if (row.number < selection.params[0]) {
+                        i++;
+                        continue;
+                    }
                 }
             }
 
@@ -867,8 +880,7 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
     int funcArgs[16] = {0, 1, 1, 2, 1, 0, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2};
 
     // Reset function's parameters to defaults
-    function->from = NO_SELECTION;
-    function->to = LAST_ROW_NUMBER;
+    memset(function->selectFunction.name, '\0', sizeof(function->selectFunction.name));
 
     // Find function
     for (int j = 0; j < (int)(sizeof(functions) / sizeof(char**)); j++) {
@@ -897,29 +909,65 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
             // Function was found, doesn't make sense to continue searching
             return errorInfo;
         } else if (streq(args->data[*position], "rows")) {
-            // Rows selection
-            if ((function->from = toRowColNum(args->data[++(*position)], false)) == INVALID_NUMBER) {
+            // Select interval of rows
+            SelectFunction selection = {.name = "rows"};
+            if ((selection.params[0] = toRowColNum(args->data[++(*position)], false)) == INVALID_NUMBER) {
                 errorInfo.error = true;
                 errorInfo.message = "Chybne cislo ve vyberu pocatecniho radku, povolena jsou cela cisla od 1.";
 
                 return errorInfo;
             }
 
-            if ((function->to = toRowColNum(args->data[++(*position)], true)) == INVALID_NUMBER) {
+            if ((selection.params[1] = toRowColNum(args->data[++(*position)], true)) == INVALID_NUMBER) {
                 errorInfo.error = true;
                 errorInfo.message = "Chybne cislo ve vyberu koncoveho radku, povolena jsou cela cisla od 1 a '-'.";
 
                 return errorInfo;
             }
 
-            if (function->to != LAST_ROW_NUMBER && function->to <= function->from) {
+            if (selection.params[1] != LAST_ROW_NUMBER && selection.params[1] <= selection.params[0]) {
                 errorInfo.error = true;
                 errorInfo.message = "Chybne poradi argumentu funkce rows, prvni cislo musi byt mensi nebo rovno.";
 
                 return errorInfo;
             }
 
-            // Move position to next function
+            // Save selection a move position to next function
+            function->selectFunction = selection;
+            (*position)++;
+        } else if (streq(args->data[*position], "beginswith")) {
+            // Select rows begin with something
+            SelectFunction selection = {.name = "beginswith"};
+
+            if ((selection.params[0] = toRowColNum(args->data[++(*position)], false)) == INVALID_NUMBER) {
+                errorInfo.error = true;
+                errorInfo.message = "Chybne cislo ve vyberu sloupce, povolena jsou cela cisla od 1.";
+
+                return errorInfo;
+            }
+
+            (*position)++;
+            memmove(selection.strParams[1], args->data[*position], strlen(args->data[*position]));
+
+            // Save selection a move position to next function
+            function->selectFunction = selection;
+            (*position)++;
+        } else if (streq(args->data[*position], "contains")) {
+            // Select rows contain something
+            SelectFunction selection = {.name = "contains"};
+
+            if ((selection.params[0] = toRowColNum(args->data[++(*position)], false)) == INVALID_NUMBER) {
+                errorInfo.error = true;
+                errorInfo.message = "Chybne cislo ve vyberu sloupce, povolena jsou cela cisla od 1.";
+
+                return errorInfo;
+            }
+
+            (*position)++;
+            memmove(selection.strParams[1], args->data[*position], strlen(args->data[*position]));
+
+            // Save selection a move position to next function
+            function->selectFunction = selection;
             (*position)++;
         } else {
             memset(function->name, '\0', sizeof(function->name));
