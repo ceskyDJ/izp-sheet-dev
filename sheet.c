@@ -178,7 +178,11 @@ int main(int argc, char **argv) {
 
         // Arguments processing
         Function functions[MAX_FUNCTIONS];
-        parseInputArguments(functions, &args);
+        if ((err = parseInputArguments(functions, &args)).error == true) {
+            writeErrorMessage(err.message);
+
+            return EXIT_FAILURE;
+        }
 
         // Data processing
         if(row.number == 1) {
