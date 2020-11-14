@@ -236,6 +236,18 @@ int main(int argc, char **argv) {
                         continue;
                     }
                 }
+            } else if (streq(selection.name, "contains")) {
+                char value[MAX_CELL_SIZE];
+                if ((err = getColumnValue(value, &row, selection.params[0], delimiter, numberOfColumns)).error == true) {
+                    writeErrorMessage(err.message);
+
+                    return EXIT_FAILURE;
+                }
+
+                if (strstr(value, selection.strParams[1]) == NULL) {
+                    i++;
+                    continue;
+                }
             }
 
             // Data processing functions
