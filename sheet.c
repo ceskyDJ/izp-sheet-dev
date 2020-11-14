@@ -263,6 +263,13 @@ int main(int argc, char **argv) {
         }
     }
 
+    // Empty input
+    if (row.number == 0) {
+        writeErrorMessage("Prazdny vstup neni povolen.");
+
+        return EXIT_FAILURE;
+    }
+
     // New content
     applyAppendRowFunctions(&args, delimiter, numberOfColumns);
 
