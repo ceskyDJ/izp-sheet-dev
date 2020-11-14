@@ -1117,7 +1117,7 @@ ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, ch
             }
         } else if (selection->params[0] != NO_SELECTION && selection->params[1] == LAST_ROW_NUMBER) {
             // Selection from N to end of file
-            if (row->number > selection->params[0]) {
+            if (row->number >= selection->params[0]) {
                 *result = true;
                 return errorInfo;
             }
