@@ -113,8 +113,8 @@ void writeErrorMessage(const char *message);
 char unifyRowDelimiters(Row *row, const char **delimiters);
 ErrorInfo verifyRow(const Row *row, char delimiter);
 ErrorInfo parseInputArguments(Function *functions, const InputArguments *args);
-ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns);
-ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, char delimiter, int numberOfColumns);
+ErrorInfo applyTableEditingFunction(Row *row, Function function, char delimiter, int *numberOfColumns);
+ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimiter, int numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
 // Table editing functions
 ErrorInfo drows(int from, int to, Row *row);
@@ -185,18 +185,41 @@ int main(int argc, char **argv) {
             numberOfColumns = countColumns(&row, delimiter);
         }
 
-        if ((err = applyTableEditingFunctions(&row, &args, delimiter, &numberOfColumns)).error == true) {
-            writeErrorMessage(err.message);
+        int i = 0;
+        while (functions[i].name[0] != '\0') {
+            // Table editing functions
+            if ((err = applyTableEditingFunction(&row, functions[i], delimiter, &numberOfColumns)).error == true) {
+                writeErrorMessage(err.message);
 
-            return EXIT_FAILURE;
+                return EXIT_FAILURE;
+            }
+
+            // Row selection (don't modify some rows with actual function)
+            if (functions[i].from != NO_SELECTION && functions[i].to != LAST_ROW_NUMBER) {
+                // Normal selection
+                if (!(row.number >= functions[i].from && row.number <= functions[i].to)) {
+                    i++;
+                    continue;
+                }
+            } else if (functions[i].from != NO_SELECTION && functions[i].to == LAST_ROW_NUMBER) {
+                // Selection from N to end of file
+                if (row.number < functions[i].from) {
+                    i++;
+                    continue;
+                }
+            }
+
+            // Data processing functions
+            if ((err = applyDataProcessingFunction(&row, functions[i], delimiter, numberOfColumns)).error == true) {
+                writeErrorMessage(err.message);
+
+                return EXIT_FAILURE;
+            }
+
+            i++;
         }
 
-        if ((err = applyDataProcessingFunctions(&row, &args, delimiter, numberOfColumns)).error == true) {
-            writeErrorMessage(err.message);
-
-            return EXIT_FAILURE;
-        }
-
+        // Write output
         if (row.deleted == false) {
             writeProcessedRow(&row);
         }
@@ -326,52 +349,39 @@ ErrorInfo parseInputArguments(Function *functions, const InputArguments *args) {
 }
 
 /**
- * Applies table editing functions on provided row
+ * Applies table editing function on provided row
  * @param row Input (raw) row
- * @param args Program's input arguments
+ * @param function Function to use
  * @param delimiters Column delimiter
  * @param numberOfColumns Number of column in each row
  * @return Error information
  */
-ErrorInfo applyTableEditingFunctions(Row *row, const InputArguments *args, char delimiter, int *numberOfColumns) {
+ErrorInfo applyTableEditingFunction(Row *row, Function function, char delimiter, int *numberOfColumns) {
     ErrorInfo errorInfo = {false};
 
-    Function function;
-    for (int i = args->skipped; i < args->size; i++) {
-        if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
-            return errorInfo;
+    // Column-operated functions are skipped if the row is set as deleted - it doesn't make sense to apply them
+    if (streq(function.name, "irow")) {
+        if (row->number == function.params[0]) {
+            writeNewRow(delimiter, *numberOfColumns);
         }
 
-        // Column-operated functions are skipped if the row is set as deleted - it doesn't make sense to apply them
-        if (streq(function.name, "irow")) {
-            if (row->number == function.params[0]) {
-                writeNewRow(delimiter, *numberOfColumns);
-            }
-        } else if (streq(function.name, "drow") || streq(function.name, "drows")) {
-            if (streq(function.name, "drow")) {
-                function.params[1] = function.params[0];
-            }
-
-            if ((errorInfo = drows(function.params[0], function.params[1], row)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "icol")) {
-            if ((errorInfo = icol(function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (row->deleted == false && streq(function.name, "acol")) {
-            if ((errorInfo = acol(row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (row->deleted == false && (streq(function.name, "dcol") || streq(function.name, "dcols"))) {
-            if (streq(function.name, "dcol")) {
-                function.params[1] = function.params[0];
-            }
-
-            if ((errorInfo = dcols(function.params[0], function.params[1], row, delimiter)).error == true) {
-                return errorInfo;
-            }
+        return errorInfo;
+    } else if (streq(function.name, "drow") || streq(function.name, "drows")) {
+        if (streq(function.name, "drow")) {
+            function.params[1] = function.params[0];
         }
+
+        return drows(function.params[0], function.params[1], row);
+    } else if (streq(function.name, "icol")) {
+        return icol(function.params[0], row, delimiter, numberOfColumns);
+    } else if (row->deleted == false && streq(function.name, "acol")) {
+        return acol(row, delimiter, numberOfColumns);
+    } else if (row->deleted == false && (streq(function.name, "dcol") || streq(function.name, "dcols"))) {
+        if (streq(function.name, "dcol")) {
+            function.params[1] = function.params[0];
+        }
+
+        return dcols(function.params[0], function.params[1], row, delimiter);
     }
 
     return errorInfo;
@@ -392,70 +402,32 @@ void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfC
 }
 
 /**
- * Applies data processing functions on provided row
+ * Applies data processing function on provided row
  * @param row Input row
- * @param args Input program arguments
+ * @param function Function to use
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of column in the row
  * @return Error information
  */
-ErrorInfo applyDataProcessingFunctions(Row *row, const InputArguments *args, char delimiter, int numberOfColumns) {
+ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimiter, int numberOfColumns) {
     ErrorInfo errorInfo = {false};
 
-    Function function;
-    for (int i = args->skipped; i < args->size; i++) {
-        if ((errorInfo = getFunctionFromArgs(&function, args, &i)).error == true) {
-            return errorInfo;
-        }
-
-        // Row selection
-        if (function.from != NO_SELECTION && function.to != LAST_ROW_NUMBER) {
-            // Normal selection
-            if (!(row->number >= function.from && row->number <= function.to)) {
-                // Do not modify this row with this function
-                continue;
-            }
-        } else if (function.from != NO_SELECTION && function.to == LAST_ROW_NUMBER) {
-            // Selection from N to end of file
-            if (row->number < function.from) {
-                // Do not modify this row with this function
-                continue;
-            }
-        }
-
-        if (streq(function.name, "cset")) {
-            if ((errorInfo = setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "tolower")) {
-            if ((errorInfo = changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "toupper")) {
-            if ((errorInfo = changeColumnCase(UPPER_CASE, function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if(streq(function.name, "round")) {
-            if ((errorInfo = roundColumnValue(function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "int")) {
-            if ((errorInfo = removeColumnDecimalPart(function.params[0], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "copy")) {
-            if ((errorInfo = copy(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "swap")) {
-            if ((errorInfo = swap(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        } else if (streq(function.name, "move")) {
-            if ((errorInfo = move(function.params[0], function.params[1], row, delimiter, numberOfColumns)).error == true) {
-                return errorInfo;
-            }
-        }
+    if (streq(function.name, "cset")) {
+        return setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns);
+    } else if (streq(function.name, "tolower")) {
+        return changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "toupper")) {
+        return changeColumnCase(UPPER_CASE, function.params[0], row, delimiter, numberOfColumns);
+    } else if(streq(function.name, "round")) {
+        return roundColumnValue(function.params[0], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "int")) {
+        return removeColumnDecimalPart(function.params[0], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "copy")) {
+        return copy(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "swap")) {
+        return swap(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+    } else if (streq(function.name, "move")) {
+        return move(function.params[0], function.params[1], row, delimiter, numberOfColumns);
     }
 
     return errorInfo;
