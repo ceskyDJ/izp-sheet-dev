@@ -135,19 +135,19 @@ ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 // Data processing functions
-ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
+void changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns);
-ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns);
-ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColumns);
-ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns);
+void copy(int from, int to, Row *row, char delimiter, int numberOfColumns);
+void swap(int first, int second, Row *row, char delimiter, int numberOfColumns);
+void move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
 ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, int *position);
 int toRowColNum(char *value, bool specialAllowed);
-ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
+void getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
 void setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
 bool isValidNumber(char *number);
 
@@ -509,19 +509,29 @@ ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimite
 
         return errorInfo;
     } else if (streq(function.name, "tolower")) {
-        return changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns);
+        changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     } else if (streq(function.name, "toupper")) {
-        return changeColumnCase(UPPER_CASE, function.params[0], row, delimiter, numberOfColumns);
+        changeColumnCase(UPPER_CASE, function.params[0], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     } else if(streq(function.name, "round")) {
         return roundColumnValue(function.params[0], row, delimiter, numberOfColumns);
     } else if (streq(function.name, "int")) {
         return removeColumnDecimalPart(function.params[0], row, delimiter, numberOfColumns);
     } else if (streq(function.name, "copy")) {
-        return copy(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+        copy(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     } else if (streq(function.name, "swap")) {
-        return swap(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+        swap(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     } else if (streq(function.name, "move")) {
-        return move(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+        move(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     }
 
     errorInfo.message = "NO_FUNCTION_USED";
@@ -565,9 +575,7 @@ ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, ch
         return errorInfo;
     } else if (streq(selection->name, "beginswith")) {
         char value[MAX_CELL_SIZE];
-        if ((errorInfo = getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns)).error == true) {
-            return errorInfo;
-        }
+        getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns);
 
         char *found = strstr(value, selection->strParams[1]);
         if (found != NULL && streq(found, value)) {
@@ -579,9 +587,7 @@ ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, ch
         return errorInfo;
     } else if (streq(selection->name, "contains")) {
         char value[MAX_CELL_SIZE];
-        if ((errorInfo = getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns)).error == true) {
-            return errorInfo;
-        }
+        getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns);
 
         if (strstr(value, selection->strParams[1]) != NULL) {
             *result = true;
@@ -630,7 +636,7 @@ ErrorInfo drows(int from, int to, Row *row) {
  * @return Error information
  */
 ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns) {
-    ErrorInfo errorInfo;
+    ErrorInfo errorInfo = {false};
 
     if ((row->size + 1) > MAX_ROW_SIZE) {
         errorInfo.error = true;
@@ -640,9 +646,7 @@ ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns) {
     }
 
     char columnValue[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(columnValue, row, column, delimiter, *numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(columnValue, row, column, delimiter, *numberOfColumns);
 
     char newColumnValue[MAX_CELL_SIZE];
     memset(newColumnValue, '\0', sizeof(newColumnValue));
@@ -747,15 +751,10 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
  * @param row Row contains the column
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of columns in the row
- * @return Error information
  */
-ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+void changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns) {
     char value[MAX_CELL_SIZE];
-
-    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(value, row, column, delimiter, numberOfColumns);
 
     int shift;
     char start;
@@ -774,8 +773,6 @@ ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, i
     }
     // It should be OK (it has been read from this column yet)
     setColumnValue(value, row, column, delimiter, numberOfColumns);
-
-    return errorInfo;
 }
 
 /**
@@ -787,12 +784,10 @@ ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, i
  * @return Error information
  */
 ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+    ErrorInfo errorInfo = {false};
 
     char value[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(value, row, column, delimiter, numberOfColumns);
 
     // The cells must contains valid number
     if (isValidNumber(value) == false) {
@@ -821,12 +816,10 @@ ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfCol
  * @return Error information
  */
 ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+    ErrorInfo errorInfo = {false};
 
     char value[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(value, row, column, delimiter, numberOfColumns);
 
     // The cells must contains valid number
     if (isValidNumber(value) == false) {
@@ -852,19 +845,12 @@ ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numb
  * @param row Row contains columns
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of columns in the row
- * @return Error information
  */
-ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
-
+void copy(int from, int to, Row *row, char delimiter, int numberOfColumns) {
     char value[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(value, row, from, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(value, row, from, delimiter, numberOfColumns);
 
     setColumnValue(value, row, to, delimiter, numberOfColumns);
-
-    return errorInfo;
 }
 
 /**
@@ -874,25 +860,16 @@ ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns) 
  * @param row Row contains columns
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of columns in the row
- * @return Error information
  */
-ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
-
+void swap(int first, int second, Row *row, char delimiter, int numberOfColumns) {
     char firstValue[MAX_CELL_SIZE];
     char secondValue[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(firstValue, row, first, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
-    if ((errorInfo = getColumnValue(secondValue, row, second, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(firstValue, row, first, delimiter, numberOfColumns);
+    getColumnValue(secondValue, row, second, delimiter, numberOfColumns);
 
     // Column numbers should be OK, so errors aren't expected
     setColumnValue(firstValue, row, second, delimiter, numberOfColumns);
     setColumnValue(secondValue, row, first, delimiter, numberOfColumns);
-
-    return errorInfo;
 }
 
 /**
@@ -902,24 +879,17 @@ ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColu
  * @param row Row contains the column
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of column in the row
- * @return Error information
  */
-ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo = {false};
-
+void move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns) {
     // Operation on one a the same column --> it doesn't make sense to do anything
     if (column == beforeColumn) {
-        return errorInfo;
+        return;
     }
 
     char moving[2 * MAX_CELL_SIZE];
     char second[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(moving, row, column, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
-    if ((errorInfo = getColumnValue(second, row, beforeColumn, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(moving, row, column, delimiter, numberOfColumns);
+    getColumnValue(second, row, beforeColumn, delimiter, numberOfColumns);
 
     // Delete column for move
     // Should be OK -> from this column has been successfully extracted before
@@ -934,8 +904,6 @@ ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numbe
     moving[strlen(moving)] = delimiter;
     strcat(moving, second);
     setColumnValue(moving, row, beforeColumn, delimiter, numberOfColumns);
-
-    return errorInfo;
 }
 
 /**
@@ -1145,18 +1113,15 @@ int toRowColNum(char *value, bool specialAllowed) {
 
 /**
  * Returns value of the selected column
- * @param value Pointer for return value (value is without '\n')
+ * @param Pointer to save value of the selected column (without '\n')
  * @param row Row contains the column
  * @param columnNumber Number of selected column
  * @param delimiter Column delimiter
- * @return Error information
  */
-ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo = {false};
-
+void getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns) {
+    // Column that doesn't exists, so it doesn't have any value
     if (columnNumber > numberOfColumns) {
-        errorInfo.error = true;
-        errorInfo.message = "Sloupec s pozadovanym cislem neexistuje.";
+        return;
     }
 
     int counter = 1;
@@ -1171,8 +1136,6 @@ ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char del
             j++;
         }
     }
-
-    return errorInfo;
 }
 
 /**
