@@ -392,7 +392,7 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
     ErrorInfo errorInfo = {false};
 
     // Check max row size
-    if (row->data[MAX_ROW_SIZE - 1] != '\0' && row->data[MAX_ROW_SIZE - 1] != '\n') {
+    if (row->size > MAX_ROW_SIZE) {
         errorInfo.error = true;
         errorInfo.message = "Byla prekrocena maximalni velikost radku.";
 
