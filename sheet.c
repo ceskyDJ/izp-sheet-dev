@@ -296,6 +296,7 @@ int main(int argc, char **argv) {
     return EXIT_SUCCESS;
 }
 
+/***********************************************************************************************Input/Output functions*/
 /**
  * Loads a new row from standard input
  * @param row Pointer to Row; it's required to set number and size fields
@@ -365,6 +366,7 @@ void writeErrorMessage(const char *message) {
     fprintf(stderr, "sheet: %s", message);
 }
 
+/******************************************************************************************Main control and processing*/
 /**
  * Unifies delimiters in provided row - all will be replaced with the first one
  * @param row Edited row
@@ -596,6 +598,7 @@ ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, ch
     return errorInfo;
 }
 
+/**********************************************************************************************Table editing functions*/
 /**
  * Marks rows from selected interval as deleted
  * @param from First selected row
@@ -737,6 +740,7 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
     return errorInfo;
 }
 
+/********************************************************************************************Data processing functions*/
 /**
  * Sets selected column's value
  * @param column Selected column's number
@@ -938,6 +942,7 @@ void move(int column, int beforeColumn, Row *row, char delimiter, int numberOfCo
     setColumnValue(moving, row, beforeColumn, delimiter, numberOfColumns);
 }
 
+/*******************************************************************************************************Help functions*/
 /**
  * Checks if the provided char is a delimiter
  * @param c Char for checking
