@@ -1,4 +1,4 @@
-/**
+/*
  * Sheet
  *
  * Simple spreadsheet editor with pipeline processing
