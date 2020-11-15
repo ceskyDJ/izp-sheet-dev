@@ -148,7 +148,7 @@ int countColumns(Row *row, char delimiter);
 ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, int *position);
 int toRowColNum(char *value, bool specialAllowed);
 ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
-ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
+void setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
 bool isValidNumber(char *number);
 
 /**
@@ -505,7 +505,9 @@ ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimite
             return errorInfo;
         }
 
-        return setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns);
+        setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns);
+
+        return errorInfo;
     } else if (streq(function.name, "tolower")) {
         return changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns);
     } else if (streq(function.name, "toupper")) {
@@ -860,9 +862,7 @@ ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns) 
         return errorInfo;
     }
 
-    if ((errorInfo = setColumnValue(value, row, to, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    setColumnValue(value, row, to, delimiter, numberOfColumns);
 
     return errorInfo;
 }
@@ -1182,14 +1182,11 @@ ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char del
  * @param columnNumber Column's number
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of column in the row
- * @return Error information
  */
-ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo = {false};
-
+void setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns) {
+    // Can't be applied because the column doesn't exists
     if (columnNumber > numberOfColumns) {
-        errorInfo.error = true;
-        errorInfo.message = "Sloupec s pozadovanym cislem neexistuje.";
+        return;
     }
 
     // Backup row data
@@ -1236,8 +1233,6 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
 
     // Count new size after changes
     row->size = (int)strlen(row->data);
-
-    return errorInfo;
 }
 
 /**
