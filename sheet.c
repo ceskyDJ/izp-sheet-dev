@@ -894,12 +894,10 @@ ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColu
  * @return Error information
  */
 ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+    ErrorInfo errorInfo = {false};
 
-    if (beforeColumn > column) {
-        errorInfo.error = true;
-        errorInfo.message = "Funkce move vyzaduje prvni cislo v parametech vetsi nez druhe.";
-
+    // Operation on one a the same column --> it doesn't make sense to do anything
+    if (column == beforeColumn) {
         return errorInfo;
     }
 
@@ -915,6 +913,11 @@ ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numbe
     // Delete column for move
     // Should be OK -> from this column has been successfully extracted before
     dcols(column, column, row, delimiter);
+
+    // In this case column numbers will be moved by 1 to left and it's important to count with it
+    if (beforeColumn > column) {
+        beforeColumn--;
+    }
 
     // Add the moving column before second selected column
     moving[strlen(moving)] = delimiter;
