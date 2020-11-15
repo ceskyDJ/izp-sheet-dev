@@ -135,6 +135,7 @@ ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 // Data processing functions
+ErrorInfo cset(int column, char *value, Row *row, char delimiter, int numberOfColumns);
 void changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns);
@@ -498,16 +499,7 @@ ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimite
     ErrorInfo errorInfo = {false};
 
     if (streq(function.name, "cset")) {
-        if ((int)strlen(function.strParams[1]) > MAX_CELL_SIZE) {
-            errorInfo.error = true;
-            errorInfo.message = "Hodnota predana funkci cset prekracuje maximalni velikost bunky.";
-
-            return errorInfo;
-        }
-
-        setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns);
-
-        return errorInfo;
+        return cset(function.params[0], function.strParams[1], row, delimiter, numberOfColumns);
     } else if (streq(function.name, "tolower")) {
         changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns);
 
@@ -740,6 +732,30 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
         row->data[row->size] = '\n';
         row->size++;
     }
+
+    return errorInfo;
+}
+
+/**
+ * Sets selected column's value
+ * @param column Selected column's number
+ * @param value Value to set to the column
+ * @param row Row contains the column
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error information
+ */
+ErrorInfo cset(int column, char *value, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if ((int)strlen(value) > MAX_CELL_SIZE) {
+        errorInfo.error = true;
+        errorInfo.message = "Hodnota predana funkci cset prekracuje maximalni velikost bunky.";
+
+        return errorInfo;
+    }
+
+    setColumnValue(value, row, column, delimiter, numberOfColumns);
 
     return errorInfo;
 }
