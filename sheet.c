@@ -630,6 +630,13 @@ ErrorInfo drows(int from, int to, Row *row) {
 ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns) {
     ErrorInfo errorInfo;
 
+    if ((row->size + 1) > MAX_ROW_SIZE) {
+        errorInfo.error = true;
+        errorInfo.message = "Provedenim prikazu icol byla prekrocena maximalni velikost radku.";
+
+        return errorInfo;
+    }
+
     char columnValue[MAX_CELL_SIZE];
     if ((errorInfo = getColumnValue(columnValue, row, column, delimiter, *numberOfColumns)).error == true) {
         return errorInfo;
