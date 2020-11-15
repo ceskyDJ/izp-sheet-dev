@@ -864,6 +864,11 @@ ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numb
  * @param numberOfColumns Number of columns in the row
  */
 void copy(int from, int to, Row *row, char delimiter, int numberOfColumns) {
+    // One of the selected columns doesn't exists, so this function can't change anything
+    if ((from > numberOfColumns) || (to > numberOfColumns)) {
+        return;
+    }
+
     char value[MAX_CELL_SIZE];
     getColumnValue(value, row, from, delimiter, numberOfColumns);
 
@@ -879,6 +884,11 @@ void copy(int from, int to, Row *row, char delimiter, int numberOfColumns) {
  * @param numberOfColumns Number of columns in the row
  */
 void swap(int first, int second, Row *row, char delimiter, int numberOfColumns) {
+    // One of the selected columns doesn't exists, so this function can't change anything
+    if ((first > numberOfColumns) || (second > numberOfColumns)) {
+        return;
+    }
+
     char firstValue[MAX_CELL_SIZE];
     char secondValue[MAX_CELL_SIZE];
     getColumnValue(firstValue, row, first, delimiter, numberOfColumns);
@@ -898,6 +908,11 @@ void swap(int first, int second, Row *row, char delimiter, int numberOfColumns) 
  * @param numberOfColumns Number of column in the row
  */
 void move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns) {
+    // One of the selected columns doesn't exists, so this function can't change anything
+    if ((column > numberOfColumns) || (beforeColumn > numberOfColumns)) {
+        return;
+    }
+
     // Operation on one a the same column --> it doesn't make sense to do anything
     if (column == beforeColumn) {
         return;
