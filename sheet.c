@@ -180,6 +180,7 @@ int main(int argc, char **argv) {
     Row row = {.size = 0, .number = 0, .last = false};
     char delimiter;
     int numberOfColumns;
+    int inputNumOfCols; // Number of columns in input table
     char preloadedData[MAX_ROW_SIZE];
     while (loadRow(&row, preloadedData) == true) {
         // Delimiter processing
@@ -202,8 +203,8 @@ int main(int argc, char **argv) {
 
         // Data processing
         if(row.number == 1) {
-            numberOfColumns = countColumns(&row, delimiter);
-        } else if (countColumns(&row, delimiter) != numberOfColumns) {
+            inputNumOfCols = numberOfColumns = countColumns(&row, delimiter);
+        } else if (countColumns(&row, delimiter) != inputNumOfCols) {
             writeErrorMessage("Kazdy radek musi mit stejny pocet sloupcu.");
 
             return EXIT_FAILURE;
