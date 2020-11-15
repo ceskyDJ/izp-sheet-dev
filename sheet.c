@@ -462,9 +462,9 @@ ErrorInfo applyTableEditingFunction(Row *row, Function function, char delimiter,
         return drows(function.params[0], function.params[1], row);
     } else if (streq(function.name, "icol")) {
         return icol(function.params[0], row, delimiter, numberOfColumns);
-    } else if (row->deleted == false && streq(function.name, "acol")) {
+    } else if (streq(function.name, "acol")) {
         return acol(row, delimiter, numberOfColumns);
-    } else if (row->deleted == false && (streq(function.name, "dcol") || streq(function.name, "dcols"))) {
+    } else if (streq(function.name, "dcol") || streq(function.name, "dcols")) {
         if (streq(function.name, "dcol")) {
             function.params[1] = function.params[0];
         }
