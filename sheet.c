@@ -375,7 +375,7 @@ char unifyRowDelimiters(Row *row, const char **delimiters) {
     char mainDelimiter = (*delimiters)[0];
 
     for (int i = 0; i < row->size; i++) {
-        if (isDelimiter(row->data[i], delimiters) && row->data[i] != mainDelimiter) {
+        if (isDelimiter(row->data[i], delimiters) && (row->data[i] != mainDelimiter)) {
             row->data[i] = mainDelimiter;
         }
     }
@@ -544,19 +544,19 @@ ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, ch
     ErrorInfo errorInfo = {false};
 
     if (streq(selection->name, "rows")) {
-        if (selection->params[0] != NO_SELECTION && selection->params[1] != LAST_ROW_NUMBER) {
+        if ((selection->params[0] != NO_SELECTION) && (selection->params[1] != LAST_ROW_NUMBER)) {
             // Normal selection
-            if (row->number >= selection->params[0] && row->number <= selection->params[1]) {
+            if ((row->number >= selection->params[0]) && (row->number <= selection->params[1])) {
                 *result = true;
                 return errorInfo;
             }
-        } else if (selection->params[0] == LAST_ROW_NUMBER && selection->params[1] == LAST_ROW_NUMBER) {
+        } else if ((selection->params[0] == LAST_ROW_NUMBER) && (selection->params[1] == LAST_ROW_NUMBER)) {
             // Selection for the last file only
             if (row->last == true) {
                 *result = true;
                 return errorInfo;
             }
-        } else if (selection->params[0] != NO_SELECTION && selection->params[1] == LAST_ROW_NUMBER) {
+        } else if ((selection->params[0] != NO_SELECTION) && (selection->params[1] == LAST_ROW_NUMBER)) {
             // Selection from N to end of file
             if (row->number >= selection->params[0]) {
                 *result = true;
@@ -713,7 +713,7 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
     int counter = 1; // Actual number of column, column numbering starts from 1
     int dataIndex = 0;
     for (int j = 0; j < row->size; j++) {
-        if (!(counter >= from && counter <= to)) {
+        if (!((counter >= from) && (counter <= to))) {
             row->data[dataIndex] = rowBackup[j];
             dataIndex++;
         } else if (j == (row->size - 1)) {
@@ -784,7 +784,7 @@ void changeColumnCase(bool newCase, int column, Row *row, char delimiter, int nu
     }
 
     for (int j = 0; j < (int)strlen(value); j++) {
-        if (value[j] >= start && value[j] <= start + ('z' - 'a')) {
+        if ((value[j] >= start) && (value[j] <= start + ('z' - 'a'))) {
             value[j] = (char)(value[j] + shift);
         }
     }
@@ -1017,7 +1017,7 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
             // Prepare arguments for the function
             for (int i = 0; i < funcArgs[j]; i++) {
                 int index = *position + i + 1; // Index of argument in InputArguments
-                if (index >= args->size || (function->params[i] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
+                if ((index >= args->size) || (function->params[i] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
                     // There is an exception... (function that accepts string value as one of its params)
                     if (!(streq(function->name, "cset") && i == 1)) {
                         errorInfo.error = true;
@@ -1116,7 +1116,7 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
  */
 int toRowColNum(char *value, bool specialAllowed) {
     // Special state - the last row number
-    if (streq(value, "-") && specialAllowed == true) {
+    if (streq(value, "-") && (specialAllowed == true)) {
         return LAST_ROW_NUMBER;
     }
 
@@ -1146,7 +1146,7 @@ void getColumnValue(char *value, const Row *row, int columnNumber, char delimite
     memset(value, '\0', MAX_CELL_SIZE);
     for (int i = 0; i < row->size; i++) {
         // \n is "delimiter" for the last column
-        if (row->data[i] == delimiter || row->data[i] == '\n') {
+        if ((row->data[i] == delimiter) || (row->data[i] == '\n')) {
             counter++;
         } else if (counter == columnNumber) {
             value[j] = row->data[i];
@@ -1189,7 +1189,7 @@ void setColumnValue(const char *value, Row *row, int columnNumber, char delimite
             dataIndex = backupIndex + i;
 
             // Delimiter is after the end of normal column, \n is at the end of the last column
-            while (rowBackup[backupIndex] != delimiter && rowBackup[backupIndex] != '\n') {
+            while ((rowBackup[backupIndex] != delimiter) && (rowBackup[backupIndex] != '\n')) {
                 backupIndex++;
             }
         }
@@ -1198,7 +1198,7 @@ void setColumnValue(const char *value, Row *row, int columnNumber, char delimite
         row->data[dataIndex] = rowBackup[backupIndex];
 
         // Mark next column
-        if (rowBackup[backupIndex] == delimiter || rowBackup[backupIndex] == '\n') {
+        if ((rowBackup[backupIndex] == delimiter) || (rowBackup[backupIndex] == '\n')) {
             counter++;
         }
 
@@ -1223,7 +1223,7 @@ void setColumnValue(const char *value, Row *row, int columnNumber, char delimite
 bool isValidNumber(char *number) {
     bool decimalPoint = false; // Was decimal point found?
     for (int i = 0; i < (int) strlen(number); i++) {
-        if ((number[i] < '0' || number[i] > '9') && (i == 0 && number[i] != '-')) {
+        if (((number[i] < '0') || (number[i] > '9')) && (i == 0 && (number[i] != '-'))) {
             if (number[i] == '.' && decimalPoint == false) {
                 decimalPoint = true;
             } else {
