@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
             } else if (err.message == NULL) {
                 // Selections on table editing functions are forbidden
                 if (selection.name[0] != '\0') {
-                    writeErrorMessage("Funkce pro vyber radku neni mozne pouzit na funkce menici strukturu tabulky.");
+                    writeErrorMessage("Funkce pro vyber radku neni mozne pouzit na funkce menici tabulku.");
 
                     return EXIT_FAILURE;
                 }
@@ -272,7 +272,7 @@ int main(int argc, char **argv) {
         }
 
         if (tableChanged && dataChanged) {
-            writeErrorMessage("Je mozne pouzit bud pouze funkce pro zmenu tabulky nebo pouze pro zpracovani dat.");
+            writeErrorMessage("Je mozne pouzit pouze funkce pro zmenu tabulky nebo pouze pro zpracovani dat.");
 
             return EXIT_FAILURE;
         }
@@ -1037,7 +1037,8 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
             // Prepare arguments for the function
             for (int i = 0; i < funcArgs[j]; i++) {
                 int index = *position + i + 1; // Index of argument in InputArguments
-                if ((index >= args->size) || (function->params[i] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
+                function->params[i] = toRowColNum(args->data[index], false);
+                if ((index >= args->size) || function->params[i] == INVALID_NUMBER) {
                     // There is an exception... (function that accepts string value as one of its params)
                     if (!(streq(function->name, "cset") && i == 1)) {
                         errorInfo.error = true;
