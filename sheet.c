@@ -1136,6 +1136,8 @@ int toRowColNum(char *value, bool specialAllowed) {
  * @param delimiter Column delimiter
  */
 void getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns) {
+    memset(value, '\0', MAX_CELL_SIZE);
+
     // Column that doesn't exists, so it doesn't have any value
     if (columnNumber > numberOfColumns) {
         return;
@@ -1143,7 +1145,6 @@ void getColumnValue(char *value, const Row *row, int columnNumber, char delimite
 
     int counter = 1;
     int j = 0;
-    memset(value, '\0', MAX_CELL_SIZE);
     for (int i = 0; i < row->size; i++) {
         // \n is "delimiter" for the last column
         if ((row->data[i] == delimiter) || (row->data[i] == '\n')) {
