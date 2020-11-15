@@ -1,4 +1,4 @@
-/**
+/*
  * Sheet
  *
  * Simple spreadsheet editor with pipeline processing
@@ -128,27 +128,29 @@ ErrorInfo parseInputArguments(Function *functions, const InputArguments *args);
 ErrorInfo applyTableEditingFunction(Row *row, Function function, char delimiter, int *numberOfColumns);
 ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimiter, int numberOfColumns);
 void applyAppendRowFunctions(InputArguments *args, char delimiter, int numberOfColumns);
+ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, char delimiter, int numberOfColumns);
 // Table editing functions
 ErrorInfo drows(int from, int to, Row *row);
 ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo acol(Row *row, char delimiter, int *numberOfColumns);
 ErrorInfo dcols(int from, int to, Row *row, char delimiter);
 // Data processing functions
-ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
+ErrorInfo cset(int column, char *value, Row *row, char delimiter, int numberOfColumns);
+void changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns);
 ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns);
-ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns);
-ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColumns);
-ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns);
+void copy(int from, int to, Row *row, char delimiter, int numberOfColumns);
+void swap(int first, int second, Row *row, char delimiter, int numberOfColumns);
+void move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns);
 // Help functions
 bool isDelimiter(char c, const char **delimiters);
 bool checkCellsSize(const Row *row, char delimiter);
 int countColumns(Row *row, char delimiter);
 ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, int *position);
 int toRowColNum(char *value, bool specialAllowed);
-ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
-ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
-ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, char delimiter, int numberOfColumns);
+void getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns);
+void setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns);
+bool isValidNumber(char *number);
 
 /**
  * Main function
@@ -178,6 +180,7 @@ int main(int argc, char **argv) {
     Row row = {.size = 0, .number = 0, .last = false};
     char delimiter;
     int numberOfColumns;
+    int inputNumOfCols; // Number of columns in input table
     char preloadedData[MAX_ROW_SIZE];
     while (loadRow(&row, preloadedData) == true) {
         // Delimiter processing
@@ -200,19 +203,32 @@ int main(int argc, char **argv) {
 
         // Data processing
         if(row.number == 1) {
-            numberOfColumns = countColumns(&row, delimiter);
+            inputNumOfCols = numberOfColumns = countColumns(&row, delimiter);
+        } else if (countColumns(&row, delimiter) != inputNumOfCols) {
+            writeErrorMessage("Kazdy radek musi mit stejny pocet sloupcu.");
+
+            return EXIT_FAILURE;
         }
 
         int i = 0;
         bool tableChanged = false;
         bool dataChanged = false;
         while (functions[i].name[0] != '\0') {
+            SelectFunction selection = functions[i].selectFunction;
+
             // Table editing functions
             if ((err = applyTableEditingFunction(&row, functions[i], delimiter, &numberOfColumns)).error == true) {
                 writeErrorMessage(err.message);
 
                 return EXIT_FAILURE;
             } else if (err.message == NULL) {
+                // Selections on table editing functions are forbidden
+                if (selection.name[0] != '\0') {
+                    writeErrorMessage("Funkce pro vyber radku neni mozne pouzit na funkce menici tabulku.");
+
+                    return EXIT_FAILURE;
+                }
+
                 // Does not make sense to continue with processing if the row was marked as deleted
                 if (row.deleted == true) {
                     break;
@@ -230,7 +246,6 @@ int main(int argc, char **argv) {
             }
 
             // Row selection (don't modify some rows with actual function)
-            SelectFunction selection = functions[i].selectFunction;
             bool accepts;
             if ((err = acceptsSelection(&accepts, &row, &selection, delimiter, numberOfColumns)).error == true) {
                 writeErrorMessage(err.message);
@@ -257,7 +272,7 @@ int main(int argc, char **argv) {
         }
 
         if (tableChanged && dataChanged) {
-            writeErrorMessage("Je mozne pouzit bud pouze funkce pro zmenu tabulky nebo pouze pro zpracovani dat.");
+            writeErrorMessage("Je mozne pouzit pouze funkce pro zmenu tabulky nebo pouze pro zpracovani dat.");
 
             return EXIT_FAILURE;
         }
@@ -281,6 +296,7 @@ int main(int argc, char **argv) {
     return EXIT_SUCCESS;
 }
 
+/***********************************************************************************************Input/Output functions*/
 /**
  * Loads a new row from standard input
  * @param row Pointer to Row; it's required to set number and size fields
@@ -350,6 +366,7 @@ void writeErrorMessage(const char *message) {
     fprintf(stderr, "sheet: %s", message);
 }
 
+/******************************************************************************************Main control and processing*/
 /**
  * Unifies delimiters in provided row - all will be replaced with the first one
  * @param row Edited row
@@ -360,7 +377,7 @@ char unifyRowDelimiters(Row *row, const char **delimiters) {
     char mainDelimiter = (*delimiters)[0];
 
     for (int i = 0; i < row->size; i++) {
-        if (isDelimiter(row->data[i], delimiters) && row->data[i] != mainDelimiter) {
+        if (isDelimiter(row->data[i], delimiters) && (row->data[i] != mainDelimiter)) {
             row->data[i] = mainDelimiter;
         }
     }
@@ -378,7 +395,7 @@ ErrorInfo verifyRow(const Row *row, char delimiter) {
     ErrorInfo errorInfo = {false};
 
     // Check max row size
-    if (row->data[MAX_ROW_SIZE - 1] != '\0' && row->data[MAX_ROW_SIZE - 1] != '\n') {
+    if (row->size > MAX_ROW_SIZE) {
         errorInfo.error = true;
         errorInfo.message = "Byla prekrocena maximalni velikost radku.";
 
@@ -445,9 +462,9 @@ ErrorInfo applyTableEditingFunction(Row *row, Function function, char delimiter,
         return drows(function.params[0], function.params[1], row);
     } else if (streq(function.name, "icol")) {
         return icol(function.params[0], row, delimiter, numberOfColumns);
-    } else if (row->deleted == false && streq(function.name, "acol")) {
+    } else if (streq(function.name, "acol")) {
         return acol(row, delimiter, numberOfColumns);
-    } else if (row->deleted == false && (streq(function.name, "dcol") || streq(function.name, "dcols"))) {
+    } else if (streq(function.name, "dcol") || streq(function.name, "dcols")) {
         if (streq(function.name, "dcol")) {
             function.params[1] = function.params[0];
         }
@@ -485,27 +502,103 @@ ErrorInfo applyDataProcessingFunction(Row *row, Function function, char delimite
     ErrorInfo errorInfo = {false};
 
     if (streq(function.name, "cset")) {
-        return setColumnValue(function.strParams[1], row, function.params[0], delimiter, numberOfColumns);
+        return cset(function.params[0], function.strParams[1], row, delimiter, numberOfColumns);
     } else if (streq(function.name, "tolower")) {
-        return changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns);
+        changeColumnCase(LOWER_CASE, function.params[0], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     } else if (streq(function.name, "toupper")) {
-        return changeColumnCase(UPPER_CASE, function.params[0], row, delimiter, numberOfColumns);
+        changeColumnCase(UPPER_CASE, function.params[0], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     } else if(streq(function.name, "round")) {
         return roundColumnValue(function.params[0], row, delimiter, numberOfColumns);
     } else if (streq(function.name, "int")) {
         return removeColumnDecimalPart(function.params[0], row, delimiter, numberOfColumns);
     } else if (streq(function.name, "copy")) {
-        return copy(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+        copy(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     } else if (streq(function.name, "swap")) {
-        return swap(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+        swap(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     } else if (streq(function.name, "move")) {
-        return move(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+        move(function.params[0], function.params[1], row, delimiter, numberOfColumns);
+
+        return errorInfo;
     }
 
     errorInfo.message = "NO_FUNCTION_USED";
     return errorInfo;
 }
 
+/**
+ * Checks if the row accepts the selection
+ * @param result Accepts this row provided selection?
+ * @param row Row for check
+ * @param selection Operated selection
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of columns in the row
+ * @return Error information
+ */
+ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if (streq(selection->name, "rows")) {
+        if ((selection->params[0] != NO_SELECTION) && (selection->params[1] != LAST_ROW_NUMBER)) {
+            // Normal selection
+            if ((row->number >= selection->params[0]) && (row->number <= selection->params[1])) {
+                *result = true;
+                return errorInfo;
+            }
+        } else if ((selection->params[0] == LAST_ROW_NUMBER) && (selection->params[1] == LAST_ROW_NUMBER)) {
+            // Selection for the last file only
+            if (row->last == true) {
+                *result = true;
+                return errorInfo;
+            }
+        } else if ((selection->params[0] != NO_SELECTION) && (selection->params[1] == LAST_ROW_NUMBER)) {
+            // Selection from N to end of file
+            if (row->number >= selection->params[0]) {
+                *result = true;
+                return errorInfo;
+            }
+        }
+
+        *result = false;
+        return errorInfo;
+    } else if (streq(selection->name, "beginswith")) {
+        char value[MAX_CELL_SIZE];
+        getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns);
+
+        char *found = strstr(value, selection->strParams[1]);
+        if (found != NULL && streq(found, value)) {
+            *result = true;
+            return errorInfo;
+        }
+
+        *result = false;
+        return errorInfo;
+    } else if (streq(selection->name, "contains")) {
+        char value[MAX_CELL_SIZE];
+        getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns);
+
+        if (strstr(value, selection->strParams[1]) != NULL) {
+            *result = true;
+            return errorInfo;
+        }
+
+        *result = false;
+        return errorInfo;
+    }
+
+    // No selection used --> row can be changed
+    *result = true;
+    return errorInfo;
+}
+
+/**********************************************************************************************Table editing functions*/
 /**
  * Marks rows from selected interval as deleted
  * @param from First selected row
@@ -539,12 +632,17 @@ ErrorInfo drows(int from, int to, Row *row) {
  * @return Error information
  */
 ErrorInfo icol(int column, Row *row, char delimiter, int *numberOfColumns) {
-    ErrorInfo errorInfo;
+    ErrorInfo errorInfo = {false};
 
-    char columnValue[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(columnValue, row, column, delimiter, *numberOfColumns)).error == true) {
+    if ((row->size + 1) > MAX_ROW_SIZE) {
+        errorInfo.error = true;
+        errorInfo.message = "Provedenim prikazu icol byla prekrocena maximalni velikost radku.";
+
         return errorInfo;
     }
+
+    char columnValue[MAX_CELL_SIZE];
+    getColumnValue(columnValue, row, column, delimiter, *numberOfColumns);
 
     char newColumnValue[MAX_CELL_SIZE];
     memset(newColumnValue, '\0', sizeof(newColumnValue));
@@ -618,7 +716,7 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
     int counter = 1; // Actual number of column, column numbering starts from 1
     int dataIndex = 0;
     for (int j = 0; j < row->size; j++) {
-        if (!(counter >= from && counter <= to)) {
+        if (!((counter >= from) && (counter <= to))) {
             row->data[dataIndex] = rowBackup[j];
             dataIndex++;
         } else if (j == (row->size - 1)) {
@@ -642,6 +740,31 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
     return errorInfo;
 }
 
+/********************************************************************************************Data processing functions*/
+/**
+ * Sets selected column's value
+ * @param column Selected column's number
+ * @param value Value to set to the column
+ * @param row Row contains the column
+ * @param delimiter Column delimiter
+ * @param numberOfColumns Number of column in the row
+ * @return Error information
+ */
+ErrorInfo cset(int column, char *value, Row *row, char delimiter, int numberOfColumns) {
+    ErrorInfo errorInfo = {false};
+
+    if ((int)strlen(value) > MAX_CELL_SIZE) {
+        errorInfo.error = true;
+        errorInfo.message = "Hodnota predana funkci cset prekracuje maximalni velikost bunky.";
+
+        return errorInfo;
+    }
+
+    setColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    return errorInfo;
+}
+
 /**
  * Changes column's case of selected column
  * @param newCase New case (LOWER_CASE or UPPER_CASE)
@@ -649,15 +772,10 @@ ErrorInfo dcols(int from, int to, Row *row, char delimiter) {
  * @param row Row contains the column
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of columns in the row
- * @return Error information
  */
-ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+void changeColumnCase(bool newCase, int column, Row *row, char delimiter, int numberOfColumns) {
     char value[MAX_CELL_SIZE];
-
-    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(value, row, column, delimiter, numberOfColumns);
 
     int shift;
     char start;
@@ -670,14 +788,12 @@ ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, i
     }
 
     for (int j = 0; j < (int)strlen(value); j++) {
-        if (value[j] >= start && value[j] <= start + ('z' - 'a')) {
+        if ((value[j] >= start) && (value[j] <= start + ('z' - 'a'))) {
             value[j] = (char)(value[j] + shift);
         }
     }
     // It should be OK (it has been read from this column yet)
     setColumnValue(value, row, column, delimiter, numberOfColumns);
-
-    return errorInfo;
 }
 
 /**
@@ -689,10 +805,16 @@ ErrorInfo changeColumnCase(bool newCase, int column, Row *row, char delimiter, i
  * @return Error information
  */
 ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+    ErrorInfo errorInfo = {false};
 
     char value[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
+    getColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    // The cells must contains valid number
+    if (isValidNumber(value) == false) {
+        errorInfo.error = true;
+        errorInfo.message = "Funkci round nelze provest na bunce, ktera neobsahuje validni cislo.";
+
         return errorInfo;
     }
 
@@ -715,23 +837,22 @@ ErrorInfo roundColumnValue(int column, Row *row, char delimiter, int numberOfCol
  * @return Error information
  */
 ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+    ErrorInfo errorInfo = {false};
 
     char value[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(value, row, column, delimiter, numberOfColumns)).error == true) {
+    getColumnValue(value, row, column, delimiter, numberOfColumns);
+
+    // The cells must contains valid number
+    if (isValidNumber(value) == false) {
+        errorInfo.error = true;
+        errorInfo.message = "Funkci round nelze provest na bunce, ktera neobsahuje validni cislo.";
+
         return errorInfo;
     }
 
-    bool decimal = true; // Is decimal part still iterating?
-    for (int j = 0; j < (int) strlen(value); j++) {
-        if (value[j] == '.') {
-            decimal = false;
-        }
-
-        if (decimal == false) {
-            value[j] = '\0';
-        }
-    }
+    double number = strtod(value, NULL);
+    memset(value, '\0', strlen(value));
+    sprintf(value, "%d", (int)number);
     // Should be OK (this column has already been used)
     setColumnValue(value, row, column, delimiter, numberOfColumns);
 
@@ -745,21 +866,17 @@ ErrorInfo removeColumnDecimalPart(int column, Row *row, char delimiter, int numb
  * @param row Row contains columns
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of columns in the row
- * @return Error information
  */
-ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+void copy(int from, int to, Row *row, char delimiter, int numberOfColumns) {
+    // One of the selected columns doesn't exists, so this function can't change anything
+    if ((from > numberOfColumns) || (to > numberOfColumns)) {
+        return;
+    }
 
     char value[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(value, row, from, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(value, row, from, delimiter, numberOfColumns);
 
-    if ((errorInfo = setColumnValue(value, row, to, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
-
-    return errorInfo;
+    setColumnValue(value, row, to, delimiter, numberOfColumns);
 }
 
 /**
@@ -769,25 +886,21 @@ ErrorInfo copy(int from, int to, Row *row, char delimiter, int numberOfColumns) 
  * @param row Row contains columns
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of columns in the row
- * @return Error information
  */
-ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+void swap(int first, int second, Row *row, char delimiter, int numberOfColumns) {
+    // One of the selected columns doesn't exists, so this function can't change anything
+    if ((first > numberOfColumns) || (second > numberOfColumns)) {
+        return;
+    }
 
     char firstValue[MAX_CELL_SIZE];
     char secondValue[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(firstValue, row, first, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
-    if ((errorInfo = getColumnValue(secondValue, row, second, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(firstValue, row, first, delimiter, numberOfColumns);
+    getColumnValue(secondValue, row, second, delimiter, numberOfColumns);
 
     // Column numbers should be OK, so errors aren't expected
     setColumnValue(firstValue, row, second, delimiter, numberOfColumns);
     setColumnValue(secondValue, row, first, delimiter, numberOfColumns);
-
-    return errorInfo;
 }
 
 /**
@@ -797,39 +910,39 @@ ErrorInfo swap(int first, int second, Row *row, char delimiter, int numberOfColu
  * @param row Row contains the column
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of column in the row
- * @return Error information
  */
-ErrorInfo move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo;
+void move(int column, int beforeColumn, Row *row, char delimiter, int numberOfColumns) {
+    // One of the selected columns doesn't exists, so this function can't change anything
+    if ((column > numberOfColumns) || (beforeColumn > numberOfColumns)) {
+        return;
+    }
 
-    if (beforeColumn > column) {
-        errorInfo.error = true;
-        errorInfo.message = "Funkce move vyzaduje prvni cislo v parametech vetsi nez druhe.";
-
-        return errorInfo;
+    // Operation on one a the same column --> it doesn't make sense to do anything
+    if (column == beforeColumn) {
+        return;
     }
 
     char moving[2 * MAX_CELL_SIZE];
     char second[MAX_CELL_SIZE];
-    if ((errorInfo = getColumnValue(moving, row, column, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
-    if ((errorInfo = getColumnValue(second, row, beforeColumn, delimiter, numberOfColumns)).error == true) {
-        return errorInfo;
-    }
+    getColumnValue(moving, row, column, delimiter, numberOfColumns);
+    getColumnValue(second, row, beforeColumn, delimiter, numberOfColumns);
 
     // Delete column for move
     // Should be OK -> from this column has been successfully extracted before
     dcols(column, column, row, delimiter);
 
+    // In this case column numbers will be moved by 1 to left and it's important to count with it
+    if (beforeColumn > column) {
+        beforeColumn--;
+    }
+
     // Add the moving column before second selected column
     moving[strlen(moving)] = delimiter;
     strcat(moving, second);
     setColumnValue(moving, row, beforeColumn, delimiter, numberOfColumns);
-
-    return errorInfo;
 }
 
+/*******************************************************************************************************Help functions*/
 /**
  * Checks if the provided char is a delimiter
  * @param c Char for checking
@@ -924,7 +1037,8 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
             // Prepare arguments for the function
             for (int i = 0; i < funcArgs[j]; i++) {
                 int index = *position + i + 1; // Index of argument in InputArguments
-                if (index >= args->size || (function->params[i] = toRowColNum(args->data[index], false)) == INVALID_NUMBER) {
+                function->params[i] = toRowColNum(args->data[index], false);
+                if ((index >= args->size) || function->params[i] == INVALID_NUMBER) {
                     // There is an exception... (function that accepts string value as one of its params)
                     if (!(streq(function->name, "cset") && i == 1)) {
                         errorInfo.error = true;
@@ -1023,7 +1137,7 @@ ErrorInfo getFunctionFromArgs(Function *function, const InputArguments *args, in
  */
 int toRowColNum(char *value, bool specialAllowed) {
     // Special state - the last row number
-    if (streq(value, "-") && specialAllowed == true) {
+    if (streq(value, "-") && (specialAllowed == true)) {
         return LAST_ROW_NUMBER;
     }
 
@@ -1037,34 +1151,30 @@ int toRowColNum(char *value, bool specialAllowed) {
 
 /**
  * Returns value of the selected column
- * @param value Pointer for return value (value is without '\n')
+ * @param Pointer to save value of the selected column (without '\n')
  * @param row Row contains the column
  * @param columnNumber Number of selected column
  * @param delimiter Column delimiter
- * @return Error information
  */
-ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo = {false};
+void getColumnValue(char *value, const Row *row, int columnNumber, char delimiter, int numberOfColumns) {
+    memset(value, '\0', MAX_CELL_SIZE);
 
+    // Column that doesn't exists, so it doesn't have any value
     if (columnNumber > numberOfColumns) {
-        errorInfo.error = true;
-        errorInfo.message = "Sloupec s pozadovanym cislem neexistuje.";
+        return;
     }
 
     int counter = 1;
     int j = 0;
-    memset(value, '\0', MAX_CELL_SIZE);
     for (int i = 0; i < row->size; i++) {
         // \n is "delimiter" for the last column
-        if (row->data[i] == delimiter || row->data[i] == '\n') {
+        if ((row->data[i] == delimiter) || (row->data[i] == '\n')) {
             counter++;
         } else if (counter == columnNumber) {
             value[j] = row->data[i];
             j++;
         }
     }
-
-    return errorInfo;
 }
 
 /**
@@ -1074,14 +1184,11 @@ ErrorInfo getColumnValue(char *value, const Row *row, int columnNumber, char del
  * @param columnNumber Column's number
  * @param delimiter Column delimiter
  * @param numberOfColumns Number of column in the row
- * @return Error information
  */
-ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo = {false};
-
+void setColumnValue(const char *value, Row *row, int columnNumber, char delimiter, int numberOfColumns) {
+    // Can't be applied because the column doesn't exists
     if (columnNumber > numberOfColumns) {
-        errorInfo.error = true;
-        errorInfo.message = "Sloupec s pozadovanym cislem neexistuje.";
+        return;
     }
 
     // Backup row data
@@ -1104,7 +1211,7 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
             dataIndex = backupIndex + i;
 
             // Delimiter is after the end of normal column, \n is at the end of the last column
-            while (rowBackup[backupIndex] != delimiter && rowBackup[backupIndex] != '\n') {
+            while ((rowBackup[backupIndex] != delimiter) && (rowBackup[backupIndex] != '\n')) {
                 backupIndex++;
             }
         }
@@ -1113,7 +1220,7 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
         row->data[dataIndex] = rowBackup[backupIndex];
 
         // Mark next column
-        if (rowBackup[backupIndex] == delimiter || rowBackup[backupIndex] == '\n') {
+        if ((rowBackup[backupIndex] == delimiter) || (rowBackup[backupIndex] == '\n')) {
             counter++;
         }
 
@@ -1128,75 +1235,24 @@ ErrorInfo setColumnValue(const char *value, Row *row, int columnNumber, char del
 
     // Count new size after changes
     row->size = (int)strlen(row->data);
-
-    return errorInfo;
 }
 
 /**
- * Checks if the row accepts the selection
- * @param result Accepts this row provided selection?
- * @param row Row for check
- * @param selection Operated selection
- * @param delimiter Column delimiter
- * @param numberOfColumns Number of columns in the row
- * @return Error information
+ * Checks if the string contains valid number
+ * @param number String for testing
+ * @return Is valid number in the string?
  */
-ErrorInfo acceptsSelection(bool *result, Row *row, SelectFunction *selection, char delimiter, int numberOfColumns) {
-    ErrorInfo errorInfo = {false};
-
-    if (streq(selection->name, "rows")) {
-        if (selection->params[0] != NO_SELECTION && selection->params[1] != LAST_ROW_NUMBER) {
-            // Normal selection
-            if (row->number >= selection->params[0] && row->number <= selection->params[1]) {
-                *result = true;
-                return errorInfo;
-            }
-        } else if (selection->params[0] == LAST_ROW_NUMBER && selection->params[1] == LAST_ROW_NUMBER) {
-            // Selection for the last file only
-            if (row->last == true) {
-                *result = true;
-                return errorInfo;
-            }
-        } else if (selection->params[0] != NO_SELECTION && selection->params[1] == LAST_ROW_NUMBER) {
-            // Selection from N to end of file
-            if (row->number >= selection->params[0]) {
-                *result = true;
-                return errorInfo;
+bool isValidNumber(char *number) {
+    bool decimalPoint = false; // Was decimal point found?
+    for (int i = 0; i < (int) strlen(number); i++) {
+        if (((number[i] < '0') || (number[i] > '9')) && (i == 0 && (number[i] != '-'))) {
+            if (number[i] == '.' && decimalPoint == false) {
+                decimalPoint = true;
+            } else {
+                return false;
             }
         }
-
-        *result = false;
-        return errorInfo;
-    } else if (streq(selection->name, "beginswith")) {
-        char value[MAX_CELL_SIZE];
-        if ((errorInfo = getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns)).error == true) {
-            return errorInfo;
-        }
-
-        char *found = strstr(value, selection->strParams[1]);
-        if (found != NULL && streq(found, value)) {
-            *result = true;
-            return errorInfo;
-        }
-
-        *result = false;
-        return errorInfo;
-    } else if (streq(selection->name, "contains")) {
-        char value[MAX_CELL_SIZE];
-        if ((errorInfo = getColumnValue(value, row, selection->params[0], delimiter, numberOfColumns)).error == true) {
-            return errorInfo;
-        }
-
-        if (strstr(value, selection->strParams[1]) != NULL) {
-            *result = true;
-            return errorInfo;
-        }
-
-        *result = false;
-        return errorInfo;
     }
 
-    // No selection used --> row can be changed
-    *result = true;
-    return errorInfo;
+    return true;
 }
