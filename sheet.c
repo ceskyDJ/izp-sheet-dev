@@ -202,6 +202,10 @@ int main(int argc, char **argv) {
         // Data processing
         if(row.number == 1) {
             numberOfColumns = countColumns(&row, delimiter);
+        } else if (countColumns(&row, delimiter) != numberOfColumns) {
+            writeErrorMessage("Kazdy radek musi mit stejny pocet sloupcu.");
+
+            return EXIT_FAILURE;
         }
 
         int i = 0;
