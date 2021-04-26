@@ -165,11 +165,10 @@ int main(int argc, char **argv) {
 
     // Delimiters
     char **delimiters;
-    if (argc >= 3) {
-        if (streq(args.data[args.skipped], "-d")) {
-            delimiters = &args.data[args.skipped + 1];
-            args.skipped += 2;
-        }
+    // EDIT: Forgotten check of -d argument existence
+    if (argc >= 3 && streq(args.data[args.skipped], "-d")) {
+        delimiters = &args.data[args.skipped + 1];
+        args.skipped += 2;
     } else {
         const char *DELIMITER = DEFAULT_DELIMITER;
         delimiters = (char **) &DELIMITER;
